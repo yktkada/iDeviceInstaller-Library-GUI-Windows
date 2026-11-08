@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using IdeviceGui.Services;
 
 namespace IdeviceGui.ViewModels;
@@ -24,6 +24,12 @@ internal sealed class JobViewModel : ObservableObject
         BundleId = item.BundleId;
         PeakBytes = item.PeakBytes;
         OrderIndex = item.OrderIndex;
+        PackageVersion = item.PackageVersion;
+        PackageDisplayName = item.PackageDisplayName;
+        InstalledBytes = item.ExpectedUncompressedBytes;
+        OriginKind = item.PackageOriginText;
+        MinOs = item.PackageMinOs;
+        DeviceFamily = item.PackageDeviceFamilyText;
         DeviceName = deviceName;
         _status = item.Status;
         _note = item.Note;
@@ -34,6 +40,46 @@ internal sealed class JobViewModel : ObservableObject
     public JobKind Kind { get; private set; }
     public string? FilePath { get; private set; }
     public string BundleId { get; }
+    public string? PackageVersion { get; private set; }
+    public string? PackageDisplayName { get; private set; }
+    public long? InstalledBytes { get; private set; }
+    public string? OriginKind { get; private set; }
+    public string? MinOs { get; private set; }
+    public string? DeviceFamily { get; private set; }
+
+    private IReadOnlyList<QueueColumn> _displayColumns = QueueColumns.OrderedVisible(QueueColumns.Default);
+
+    /// <summary>队列行当前使用的字段顺序；由 DeviceQueueViewModel 在设置变化时统一下发。</summary>
+    public IReadOnlyList<QueueColumn> DisplayColumns
+    {
+        get => _displayColumns;
+        set
+        {
+            _displayColumns = value;
+            OnPropertyChanged(nameof(Display));
+        }
+    }
+
+    public string PackageVersionText => string.IsNullOrWhiteSpace(PackageVersion) ? "—" : PackageVersion;
+    public string DisplayNameText => string.IsNullOrWhiteSpace(PackageDisplayName) ? FileName : PackageDisplayName;
+    public string InstalledSizeText => InstalledBytes is > 0 ? FormatBytes(InstalledBytes.Value) : "—";
+    public string FilePathText => string.IsNullOrWhiteSpace(FilePath) ? "—" : FilePath;
+    public string OriginText => string.IsNullOrWhiteSpace(OriginKind) ? "—" : OriginKind;
+    public string MinOsText => string.IsNullOrWhiteSpace(MinOs) ? "—" : MinOs;
+    public string DeviceFamilyText => string.IsNullOrWhiteSpace(DeviceFamily) ? "—" : DeviceFamily;
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB" };
+        double value = bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+        return $"{value:0.#} {units[unit]}";
+    }
 
     /// <summary>峰值占用（压缩+解压）；仅显示/空间用，队列顺序改由服务端 OrderIndex 决定。</summary>
     public long PeakBytes { get; private set; }
@@ -51,6 +97,19 @@ internal sealed class JobViewModel : ObservableObject
         FilePath = item.FilePath;
         PeakBytes = item.PeakBytes;
         OrderIndex = item.OrderIndex;
+        PackageVersion = item.PackageVersion;
+        PackageDisplayName = item.PackageDisplayName;
+        InstalledBytes = item.ExpectedUncompressedBytes;
+        OriginKind = item.PackageOriginText;
+        MinOs = item.PackageMinOs;
+        DeviceFamily = item.PackageDeviceFamilyText;
+        OnPropertyChanged(nameof(PackageVersionText));
+        OnPropertyChanged(nameof(DisplayNameText));
+        OnPropertyChanged(nameof(InstalledSizeText));
+        OnPropertyChanged(nameof(FilePathText));
+        OnPropertyChanged(nameof(OriginText));
+        OnPropertyChanged(nameof(MinOsText));
+        OnPropertyChanged(nameof(DeviceFamilyText));
         Status = item.Status;
         Note = item.Note;
         Percent = item.Percent;
@@ -168,9 +227,7 @@ internal sealed class JobViewModel : ObservableObject
     /// </summary>
     public bool CanCancel => _status.IsCancellable(Kind);
 
-    public string Display =>
-        $"{FileName}   [{StatusText}{DisplayPercentText}]" +
-        (string.IsNullOrEmpty(Note) ? "" : $"   {Note}");
+    public string Display => QueueColumns.Format(this, DisplayColumns);
 
     // UIA 名称与界面一致（AGENTS §6.3）
     public override string ToString() => Display;

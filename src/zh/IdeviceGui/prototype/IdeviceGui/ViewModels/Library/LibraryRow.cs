@@ -30,7 +30,7 @@ internal sealed record CompatConflict(string Reason);
 /// 不重建集合（硬约束 #8）、不丢选中与滚动位置。
 /// </para>
 /// </summary>
-internal sealed class LibraryRow : ObservableObject
+internal sealed class LibraryRow : ObservableObject, IMultiSelectRow
 {
     private long _appSize;
     private long _fileSize;

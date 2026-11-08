@@ -1,9 +1,9 @@
-﻿<Window x:Class="IdeviceGui.Views.MainWindow"
+<Window x:Class="IdeviceGui.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:IdeviceGui.Views"
-        Title="iDeviceInstaller+Library" Icon="/app.ico" Height="760" Width="1180" MinHeight="720"
-        WindowStartupLocation="CenterScreen">
+        Title="iDeviceInstaller+Library" Height="760" Width="1180" MinHeight="720"
+        WindowStartupLocation="CenterScreen" Icon="/app.ico">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <!-- 2026-11-01 用户定：选中改灰（蓝只留给双击 armed），单元格去掉焦点黑框 -->
@@ -156,6 +156,10 @@
                     <Setter Property="Background" Value="{StaticResource ArmedRowBrush}" />
                     <Setter Property="Foreground" Value="#FFFFFFFF" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource ArmedRowBrush}" />
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
         <!-- 设备应用单元格：必须把单元格背景设为透明，否则 DataGrid 默认选中蓝会盖住整行颜色。
@@ -164,10 +168,33 @@
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="#FF000000" />
+            <Setter Property="TextElement.Foreground" Value="#FF000000" />
             <Setter Property="BorderBrush" Value="#FFC8C8C8" />
             <Setter Property="BorderThickness" Value="0,0,0.5,0" />
             <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                    <Setter Property="TextElement.Foreground" Value="#FFFFFFFF" />
+                </Trigger>
                 <DataTrigger Binding="{Binding IsArmed}" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                    <Setter Property="TextElement.Foreground" Value="#FFFFFFFF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                    <Setter Property="TextElement.Foreground" Value="#FFFFFFFF" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- 设备应用文字：DataGridTextColumn 的 TextBlock 不继承 DataGridCell.Foreground，
+             这里显式给 ElementStyle，多选/armed 时把字刷白。 -->
+        <Style x:Key="DeviceAppTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FF000000" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsArmed}" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
                     <Setter Property="Foreground" Value="#FFFFFFFF" />
                 </DataTrigger>
             </Style.Triggers>
@@ -307,7 +334,7 @@
             <!-- 2026-11-01 用户定：队列行高 24 DIP、垂直居中、选中灰底黑字 -->
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Foreground" Value="#FF000000" />
-            <Setter Property="Height" Value="24" />
+            <Setter Property="Height" Value="30" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Padding" Value="4,0" />
             <Setter Property="Background" Value="{Binding RowBrush}" />
@@ -634,6 +661,30 @@
                                    VerticalAlignment="Center" Foreground="#FF666666"
                                    Text="{Binding LibraryCountText}" />
                     </WrapPanel>
+                    <!-- 设备应用页独立工具栏：不占用资料库的工具条；多选/批量卸载只作用于当前设备。 -->
+                    <WrapPanel x:Name="DeviceAppsToolbar" DockPanel.Dock="Top" Orientation="Horizontal"
+                               Margin="0,0,0,4" Visibility="Collapsed"
+                               TextElement.FontSize="11" TextElement.FontFamily="Microsoft YaHei UI">
+                        <Button x:Name="DeviceAppsMultiSelectButton"
+                                Content="{Binding DeviceAppsMultiSelectButtonText}"
+                                FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
+                                VerticalAlignment="Center"
+                                Click="OnToggleDeviceAppsMultiSelectClick"
+                                ToolTip="设备应用多选：单击行选中/取消，然后批量卸载" />
+                        <Button x:Name="DeviceAppsBatchUninstallButton"
+                                Content="{Binding DeviceAppsBatchUninstallText}"
+                                FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
+                                VerticalAlignment="Center"
+                                IsEnabled="{Binding HasSelectedDeviceApps}"
+                                Click="OnUninstallSelectedDeviceAppsClick"
+                                ToolTip="卸载所有选中的设备应用" />
+                        <Button Content="全选" FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
+                                VerticalAlignment="Center" Click="OnSelectAllDeviceAppsClick" />
+                        <Button Content="取消选择" FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
+                                VerticalAlignment="Center" Click="OnClearDeviceAppsSelectionClick" />
+                        <TextBlock Text="{Binding DeviceAppsCountText}" FontSize="11" Margin="2,0,0,2"
+                                   VerticalAlignment="Center" Foreground="#FF666666" />
+                    </WrapPanel>
                     <Grid>
                     <DataGrid x:Name="LibraryGrid"
                               IsEnabled="{Binding IsLibraryInteractive}"
@@ -657,6 +708,10 @@
                               ScrollViewer.HorizontalScrollBarVisibility="Auto">
                         <DataGrid.ContextMenu>
                             <ContextMenu x:Name="SingleLibraryContextMenu">
+                                <MenuItem x:Name="SingleForceInstallMenu"
+                                          Header="强制安装到当前设备（跳过最低 iOS 与空间检查）"
+                                          Click="OnForceInstallClick" />
+                                <Separator />
                                 <MenuItem Header="复制 BundleID" Click="OnCopyBundleId" />
                                 <MenuItem Header="复制名称" Click="OnCopyName" />
                                 <MenuItem Header="复制版本" Click="OnCopyVersion" />
@@ -694,7 +749,10 @@
                               VirtualizingPanel.VirtualizationMode="Recycling"
                               RowStyle="{StaticResource DeviceAppRowStyle}"
                               CellStyle="{StaticResource DeviceAppCellStyle}"
-                              PreviewMouseLeftButtonDown="OnDeviceAppsPreviewMouseLeftButtonDown">
+                              PreviewMouseLeftButtonDown="OnDeviceAppsPreviewMouseLeftButtonDown"
+                              PreviewMouseMove="OnDeviceAppsPreviewMouseMove"
+                              PreviewMouseLeftButtonUp="OnDeviceAppsPreviewMouseLeftButtonUp"
+                              PreviewMouseRightButtonDown="OnDeviceAppsPreviewMouseRightButtonDown">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="图标" Width="40" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -704,9 +762,33 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" />
-                            <DataGridTextColumn Header="版本" Binding="{Binding VersionText}" Width="90" />
-                            <DataGridTextColumn Header="BundleId" Binding="{Binding BundleId}" Width="220" />
+                            <DataGridTemplateColumn Header="名称" Width="*" SortMemberPath="Name">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}"
+                                                   Style="{StaticResource DeviceAppTextStyle}"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="版本" Width="90" SortMemberPath="VersionText">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding VersionText}"
+                                                   Style="{StaticResource DeviceAppTextStyle}"
+                                                   VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="BundleId" Width="220" SortMemberPath="BundleId">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding BundleId}"
+                                                   Style="{StaticResource DeviceAppTextStyle}"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                     <!-- 扫描期间占位：不逐批 Build，扫描结束一次性显示（2026-11-08 用户定） -->

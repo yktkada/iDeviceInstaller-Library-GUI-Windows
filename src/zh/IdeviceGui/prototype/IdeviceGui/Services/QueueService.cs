@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.IO;
 
 namespace IdeviceGui.Services;
@@ -62,6 +62,16 @@ internal sealed class QueueItem
     /// 不满足直接判失败、不进入上传（2026-10-31 用户要求：不能等传完才报"版本太低"）。null = 未知，不拦。
     /// </summary>
     public string? PackageMinOs { get; set; }
+
+    /// <summary>入队时的资料库 App 显示名（不是文件名）；卸载任务尽量带设备应用名。</summary>
+    public string? PackageDisplayName { get; set; }
+
+    /// <summary>入队时的 IPA 来源/设备族显示文案；卸载任务为 null。</summary>
+    public string? PackageOriginText { get; set; }
+    public string? PackageDeviceFamilyText { get; set; }
+
+    /// <summary>用户明确要求强制安装：跳过最低 iOS 与空间检查（2026-11-08 用户定）。</summary>
+    public bool ForceInstall { get; set; }
 
     /// <summary>
     /// 预计解压体积：`.app` 未压缩总量（M3 深解析的 `AppSize`，docs/07 §3.4）。
@@ -470,7 +480,11 @@ internal sealed class QueueService
         string? packageVersion = null,
         long? expectedUncompressedBytes = null,
         string? packageMinOs = null,
-        bool? hadInstalledBefore = null)
+        bool? hadInstalledBefore = null,
+        string? packageDisplayName = null,
+        string? packageOriginText = null,
+        string? packageDeviceFamilyText = null,
+        bool forceInstall = false)
     {
         // 峰值占用要读文件元数据：**在锁外算**（硬约束 #3：锁内只做内存操作；审查 N3）
         var peakBytes = ComputePeakBytes(filePath, expectedUncompressedBytes);
@@ -519,6 +533,10 @@ internal sealed class QueueService
                 // 复审 B2：同路径重入队（比如包被换版本）必须刷新，否则泵内用旧 MinOs / 旧版本比对
                 existing.PackageVersion = packageVersion;
                 existing.PackageMinOs = packageMinOs;
+                existing.PackageDisplayName = packageDisplayName;
+                existing.PackageOriginText = packageOriginText;
+                existing.PackageDeviceFamilyText = packageDeviceFamilyText;
+                existing.ForceInstall = forceInstall;
                 existing.OrderIndex = NextOrderIndex(list, except: existing);
                 ReorderPending(list);
                 return new EnqueueResult(existing, EnqueueDisposition.Reset, existing.Status);
@@ -534,6 +552,10 @@ internal sealed class QueueService
                 PackageVersion = packageVersion,
                 ExpectedUncompressedBytes = expectedUncompressedBytes,
                 PackageMinOs = packageMinOs,
+                PackageDisplayName = packageDisplayName,
+                PackageOriginText = packageOriginText,
+                PackageDeviceFamilyText = packageDeviceFamilyText,
+                ForceInstall = forceInstall,
                 OrderIndex = NextOrderIndex(list),
                 PeakBytes = peakBytes,
                 HadInstalledBefore = hadInstalledBefore,
@@ -1191,11 +1213,13 @@ internal sealed class QueueService
         // 3 版本前置校验（2026-10-31 用户要求，复审 B1 采纳挪到这里）：
         //     **先**走恢复回读——"上次中断但已装好"的条目应先记完成（避免覆盖清数据），
         //     确认没装再比 MinOs：不满足直接失败，不进入上传。
-        if (item.Kind == JobKind.Install &&
+        if (item.Kind == JobKind.Install && !item.ForceInstall &&
             VersionRules.CheckMinimumOs(item.PackageMinOs, probe.Version) is { } minOsError)
         {
             return FailItem(udid, item, "未满足版本要求：" + minOsError + "（未上传，可尝试强制安装）");
         }
+        if (item.Kind == JobKind.Install && item.ForceInstall)
+            LogDetail(udid, $"强制安装：跳过最低 iOS 检查（{DisplayName(item)}）");
 
         // 4 执行前检查源文件（用户 2026-10-30 拍板；判据与 MainViewModel 入队检查同步维护）：
         // 存在 + 可读（被占用等 200 ms 重试一次），失败就秒判 Failed，不再拉起 ideviceinstaller 空跑 2–4 秒。
@@ -1279,8 +1303,10 @@ internal sealed class QueueService
     /// <summary>步骤 7：空间检查（清理之后）。null = 继续。</summary>
     private async Task<bool?> CheckSpaceStepAsync(string udid, QueueItem item, CancellationToken ct)
     {
-        // 7 空间检查（清理之后，07 §3.1）
-        if (item.Kind == JobKind.Install)
+        // 7 空间检查（清理之后，07 §3.1）；强制安装跳过本步骤（2026-11-08 用户定）。
+        if (item.Kind == JobKind.Install && item.ForceInstall)
+            LogDetail(udid, $"强制安装：跳过空间检查（{DisplayName(item)}）");
+        else if (item.Kind == JobKind.Install)
         {
             SetStatus(udid, item, QueueStatus.SpaceCheck);
             var spaceNote = await CheckSpaceAsync(udid, item, ct).ConfigureAwait(false);
@@ -1335,7 +1361,7 @@ internal sealed class QueueService
                 // "其实装好了"：上传中断 / 断联 / 假报错都可能让 CLI 报错但 App 已装上（总览 §6.1）
                 var confirmed = await TryConfirmInstalledAfterFailureAsync(udid, item, ct).ConfigureAwait(false);
                 if (confirmed is not null)
-                    return CompleteItem(udid, item, $"安装出现错误（{reason}），但回读已确认安装{confirmed}");
+                    return CompleteItem(udid, item, $"安装出现错误（{reason}），但回读已确认安装");
 
                 return FailItem(udid, item, "安装未完成：" + reason);
             }
@@ -1460,11 +1486,11 @@ internal sealed class QueueService
         switch (match)
         {
             case true:
-                CompleteItem(udid, item, $"上次中断，回读已确认安装 {hit.Value.Version}，已跳过重试");
+                CompleteItem(udid, item, "上次中断，回读已确认安装，已跳过重试");
                 return RecoveryOutcome.AlreadyInstalled;
             case null:
                 // 版本未知（ShortVersion / Build 都缺）：只按 BundleId 判定，不推测
-                CompleteItem(udid, item, "上次中断，回读确认已装（版本未知），已跳过重试");
+                CompleteItem(udid, item, "上次中断，回读确认已装，已跳过重试");
                 return RecoveryOutcome.AlreadyInstalled;
             default:
                 LogDetail(udid, $"恢复前回读：已装 {hit.Value.Version} ≠ 包版本 {item.PackageVersion}，重装");
@@ -1560,9 +1586,9 @@ internal sealed class QueueService
                 {
                     var match = InstalledAppSet.VersionsMatch(hit.Value, item.PackageVersion);
                     if (match == true)
-                        return (true, $"完成回读确认：已安装 {hit.Value.Version}", false);
+                        return (true, "完成回读确认", false);
                     if (match is null)
-                        return (true, "回读确认已装（版本未知）", false);
+                        return (true, "回读确认已装", false);
 
                     item.AutoRetrySuppressed = true;   // 立刻置位：后续轮次异常也绕不过
                     lastFailure = $"设备已装版本 {hit.Value.Version}，与包版本 {item.PackageVersion} 不一致";
@@ -1724,6 +1750,10 @@ internal sealed class QueueService
             PackageKey = failed.PackageKey,
             PackageVersion = failed.PackageVersion,
             PackageMinOs = failed.PackageMinOs,
+            PackageDisplayName = failed.PackageDisplayName,
+            PackageOriginText = failed.PackageOriginText,
+            PackageDeviceFamilyText = failed.PackageDeviceFamilyText,
+            ForceInstall = failed.ForceInstall,
             ExpectedUncompressedBytes = failed.ExpectedUncompressedBytes,
             PeakBytes = failed.PeakBytes,
             HadInstalledBefore = failed.HadInstalledBefore,
@@ -1799,13 +1829,16 @@ internal sealed class QueueService
         return true;
     }
 
-    /// <summary>成功收尾：状态 Done + 进度 100% + 可选的 Note（回读结论写在这里）。</summary>
+    /// <summary>
+    /// 成功收尾：状态 Done + 进度 100%。**成功不再保留备注**（2026-11-08 用户定：
+    /// 完成只显示“完成”，版本交给版本列，只有失败才提示）。
+    /// </summary>
     private bool CompleteItem(string udid, QueueItem item, string? note)
     {
         item.Percent = 100;
         RaiseProgress(udid, item, 100);
-        item.Note = note;
-        SetStatus(udid, item, QueueStatus.Done, note);
+        item.Note = null;
+        SetStatus(udid, item, QueueStatus.Done, null);
         LogEnd(udid, $"完成 {DisplayName(item)}" + (note is null ? "" : $"（{note}）"));
         return false;
     }

@@ -1,9 +1,9 @@
-﻿<Window x:Class="IdeviceGui.Views.AdvancedFilterWindow" x:ClassModifier="internal"
+<Window x:Class="IdeviceGui.Views.AdvancedFilterWindow" x:ClassModifier="internal"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="高级筛选" Icon="/app.ico" Width="780" Height="640" MinWidth="620" MinHeight="480"
+        Title="高级筛选" Width="780" Height="640" MinWidth="620" MinHeight="480"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        AutomationProperties.AutomationId="AdvancedFilterWindow">
+        AutomationProperties.AutomationId="AdvancedFilterWindow" Icon="/app.ico">
     <DockPanel Margin="10">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
             <TextBlock Text="组内统一用「且 / 或」，组间固定为「且」；已勾选的列不能重复。" VerticalAlignment="Center" Foreground="#FF666666" />

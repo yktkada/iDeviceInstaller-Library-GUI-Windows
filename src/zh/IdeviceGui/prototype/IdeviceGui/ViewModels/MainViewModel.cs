@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -40,6 +40,7 @@ internal sealed class MainViewModel : ObservableObject
     private readonly ICliRunner _cli;
     private readonly ReadbackService _readback;
     private readonly QueueService _queue;
+    private IReadOnlyList<QueueColumnSetting> _queueColumnSettings = QueueColumns.Default;
     private readonly IProgress<LogLine> _log;
 
     /// <summary>b3a：全量日志环（2000 行）。简洁模式下界面不显示的行也存在这里，切到详细立刻可见。</summary>
@@ -274,6 +275,9 @@ internal sealed class MainViewModel : ObservableObject
 
     private DeviceQueueViewModel? _selectedDevice;
     private bool _isDeviceAppsMode;
+    private bool _isDeviceAppsMultiSelectMode;
+    private HashSet<DeviceAppRow> _deviceAppsDragBaseSelection = new();
+    private readonly ConcurrentDictionary<string, byte> _deviceAppsPrefetching = new();
     private CancellationTokenSource? _deviceAppsCts;
     private string _deviceAppsSignature = "";
     private readonly ObservableCollection<DeviceAppRow> _deviceApps = new();
@@ -349,11 +353,25 @@ internal sealed class MainViewModel : ObservableObject
         {
             if (!SetProperty(ref _isDeviceAppsMode, value)) return;
             OnPropertyChanged(nameof(IsLibraryScanOverlayVisible));
-            if (value) _ = RefreshDeviceAppsAsync();
+            if (value) _ = SafeFireAndForget.Run(RefreshDeviceAppsAsync, "刷新设备应用");
+            else
+            {
+                _deviceAppsCts?.Cancel();
+                ExitDeviceAppsMultiSelect();
+            }
         }
     }
 
     public ObservableCollection<DeviceAppRow> DeviceApps => _deviceApps;
+
+    public IReadOnlyList<QueueColumnSetting> QueueColumnSettings => _queueColumnSettings;
+
+    private void ApplyQueueColumnsToDevices()
+    {
+        var visible = QueueColumns.OrderedVisible(_queueColumnSettings);
+        foreach (var device in Devices) device.ApplyQueueColumns(visible);
+        OnPropertyChanged(nameof(QueueColumnSettings));
+    }
 
     private string _deviceAppsCountText = "设备应用：未读取";
 
@@ -361,6 +379,37 @@ internal sealed class MainViewModel : ObservableObject
     {
         get => _deviceAppsCountText;
         private set => SetProperty(ref _deviceAppsCountText, value);
+    }
+
+    /// <summary>设备应用页的独立多选（与资料库多选互不影响）。</summary>
+    public bool IsDeviceAppsMultiSelectMode
+    {
+        get => _isDeviceAppsMultiSelectMode;
+        private set
+        {
+            if (!SetProperty(ref _isDeviceAppsMultiSelectMode, value)) return;
+            OnPropertyChanged(nameof(DeviceAppsMultiSelectButtonText));
+            OnPropertyChanged(nameof(DeviceAppsSelectedCount));
+            OnPropertyChanged(nameof(DeviceAppsBatchUninstallText));
+            OnPropertyChanged(nameof(HasSelectedDeviceApps));
+        }
+    }
+
+    public int DeviceAppsSelectedCount => DeviceApps.Count(r => r.IsMultiSelected);
+
+    public string DeviceAppsMultiSelectButtonText =>
+        IsDeviceAppsMultiSelectMode ? $"多选: {DeviceAppsSelectedCount} 项" : "多选:关";
+
+    public string DeviceAppsBatchUninstallText => $"卸载选中 ({DeviceAppsSelectedCount})";
+
+    public bool HasSelectedDeviceApps => DeviceAppsSelectedCount > 0;
+
+    private void NotifyDeviceAppsSelectionChanged()
+    {
+        OnPropertyChanged(nameof(DeviceAppsSelectedCount));
+        OnPropertyChanged(nameof(DeviceAppsMultiSelectButtonText));
+        OnPropertyChanged(nameof(DeviceAppsBatchUninstallText));
+        OnPropertyChanged(nameof(HasSelectedDeviceApps));
     }
 
     /// <summary>资料库行高（DIP）；写入即持久化到 <c>Grid.RowHeight</c>（后台写，不阻塞 UI）。</summary>
@@ -529,7 +578,11 @@ internal sealed class MainViewModel : ObservableObject
             if (!SetProperty(ref _selectedDevice, value)) return;
             SyncLibraryDeviceContext();
             if (_compatFilterMode != CompatFilterMode.Off) RefreshLibraryRows(force: true);
-            if (_isDeviceAppsMode) _ = RefreshDeviceAppsAsync();
+            if (_isDeviceAppsMode)
+            {
+                ExitDeviceAppsMultiSelect();
+                _ = SafeFireAndForget.Run(RefreshDeviceAppsAsync, "刷新设备应用");
+            }
             EnqueueCommand.RaiseCanExecuteChanged();
             RefreshLibraryMarkers();
             StartProgressHideCountdown(value);
@@ -646,22 +699,36 @@ internal sealed class MainViewModel : ObservableObject
     public void SelectDragRange(LibraryRow anchor, LibraryRow current)
     {
         if (!IsMultiSelectMode) return;
-        var first = -1;
-        var last = -1;
-        for (var i = 0; i < _visibleFilteredRows.Count; i++)
-        {
-            if (ReferenceEquals(_visibleFilteredRows[i], anchor)) first = i;
-            if (ReferenceEquals(_visibleFilteredRows[i], current)) last = i;
-        }
-        if (first < 0 || last < 0) return;
-        if (first > last) (first, last) = (last, first);
-        for (var i = 0; i < _visibleFilteredRows.Count; i++)
-        {
-            var row = _visibleFilteredRows[i];
-            if (row.IsGroup || row.IsAppendedSeparator) continue;
-            row.IsMultiSelected = _dragBaseSelection.Contains(row) ^ (i >= first && i <= last);
-        }
+        if (!MultiSelectRange.Apply(
+                _visibleFilteredRows,
+                anchor,
+                current,
+                _dragBaseSelection,
+                row => row.IsGroup || row.IsAppendedSeparator))
+            return;
         NotifyMultiSelectionChanged();
+    }
+
+    /// <summary>设备应用拖动开始：与资料库同一套范围选择契约。</summary>
+    public bool BeginDeviceAppDragSelection(DeviceAppRow anchor)
+    {
+        if (!IsDeviceAppsMultiSelectMode || !DeviceApps.Contains(anchor)) return false;
+        _deviceAppsDragBaseSelection = DeviceApps.Where(r => r.IsMultiSelected).ToHashSet();
+        return true;
+    }
+
+    /// <summary>设备应用拖动范围：复用 <see cref="MultiSelectRange"/>，不另写一套反选逻辑。</summary>
+    public void SelectDeviceAppDragRange(DeviceAppRow anchor, DeviceAppRow current)
+    {
+        if (!IsDeviceAppsMultiSelectMode) return;
+        if (!MultiSelectRange.Apply(
+                DeviceApps,
+                anchor,
+                current,
+                _deviceAppsDragBaseSelection,
+                static _ => false))
+            return;
+        NotifyDeviceAppsSelectionChanged();
     }
 
     /// <summary>全选：只选当前筛选后可见的文件行，不含被筛选隐藏后追加到末尾的行。</summary>
@@ -1320,6 +1387,10 @@ internal sealed class MainViewModel : ObservableObject
             // M4-b4：设备信息行字段配置（接口预留——设置面板以后接；坏值回默认）。默认集 = 名称/型号/版本/容量/颜色/电池健康/ECID。
             var infoFieldsRaw = SettingsStore.GetString(db, DeviceInfoFields.SettingsKey);
             DeviceInfo.Fields = DeviceInfoFields.Parse(infoFieldsRaw);
+
+            var queueColumnsRaw = SettingsStore.GetString(db, QueueColumns.SettingsKey);
+            _queueColumnSettings = QueueColumns.Parse(queueColumnsRaw);
+            ApplyQueueColumnsToDevices();
             AppendLog($"设备信息字段：{string.Join(" · ", DeviceInfoFields.OrderedVisible(DeviceInfo.Fields)
                 .Select(DeviceInfoFields.ToId))}（设置键 {DeviceInfoFields.SettingsKey}={(infoFieldsRaw is null ? "(未设置)" : "已设置")}）", LogKind.Detail);
 
@@ -1555,7 +1626,7 @@ internal sealed class MainViewModel : ObservableObject
                 var defaultFolder = _ipaFolder;
                 var (added, error) = await Task.Run(() =>
                 {
-                    try { Directory.CreateDirectory(defaultFolder); } catch { /* Add reports missing folder */ }
+                    try { Directory.CreateDirectory(defaultFolder); } catch { /* Add will report missing folder */ }
                     return ScanRootStore.Add(_db, defaultFolder);
                 });
                 if (added is not null) rows.Add(added);
@@ -2143,7 +2214,7 @@ internal sealed class MainViewModel : ObservableObject
                 device?.Apply(i);
                 _ = SafeFireAndForget.Run(() => RunSpaceProjectionAfterReadbackAsync(i.Udid), "空间预检");
                 if (device is not null && ReferenceEquals(device, SelectedDevice) && _isDeviceAppsMode)
-                    _ = RefreshDeviceAppsAsync();
+                    _ = SafeFireAndForget.Run(RefreshDeviceAppsAsync, "刷新设备应用");
                 break;
         }
 
@@ -2163,7 +2234,8 @@ internal sealed class MainViewModel : ObservableObject
 
         try
         {
-            var snapshot = _queue.Snapshot(udid);
+            // 强制安装明确跳过空间检查：不参与回读后的空间预演，也不产生“装不下”提示。
+            var snapshot = _queue.Snapshot(udid).Where(x => !x.ForceInstall).ToList();
             var hasInstall = snapshot.Any(x => x.Kind == JobKind.Install &&
                                                !x.Status.IsFinished() &&
                                                !x.Status.IsInFlight());
@@ -2468,6 +2540,7 @@ internal sealed class MainViewModel : ObservableObject
         ReconnectStableSeconds = _reconnectStableSeconds,
         AutoRetryAttempts = _autoRetryAttempts,
         DeviceFields = DeviceInfo.Fields.ToList(),
+        QueueColumns = _queueColumnSettings.ToList(),
     };
 
     /// <summary>设置窗口显示用：排序/搜索范围显示“已保存的默认值”，其余仍是当前状态。</summary>
@@ -2629,6 +2702,14 @@ internal sealed class MainViewModel : ObservableObject
             foreach (var device in Devices) device.Device.RefreshInfoLine();
             if (persist) SaveSetting(DeviceInfoFields.SettingsKey, DeviceInfoFields.Serialize(DeviceInfo.Fields));
         }
+
+        // ⑨ 队列行字段（顺序 + 可见性；Display 字符串重新拼）
+        if (!_queueColumnSettings.SequenceEqual(draft.QueueColumns))
+        {
+            _queueColumnSettings = draft.QueueColumns.ToList();
+            ApplyQueueColumnsToDevices();
+        }
+        if (persist) SaveSetting(QueueColumns.SettingsKey, QueueColumns.Serialize(_queueColumnSettings));
     }
 
     private void ApplyLogToFile(bool enabled, bool persist)
@@ -2886,6 +2967,7 @@ internal sealed class MainViewModel : ObservableObject
                         Online = true,
                     };
                     var queueVm = new DeviceQueueViewModel(_queue, device);
+                    queueVm.ApplyQueueColumns(QueueColumns.OrderedVisible(_queueColumnSettings));
                     queueVm.Device.PropertyChanged += (_, args) =>
                     {
                         if (args.PropertyName == nameof(DeviceInfo.Online)) OnDeviceOnlineChanged(queueVm);
@@ -3184,6 +3266,14 @@ internal sealed class MainViewModel : ObservableObject
         return Task.CompletedTask;
     }
 
+    /// <summary>右键单行「强制安装到当前设备」：只跳过最低 iOS 与空间检查，其他校验照旧。</summary>
+    internal bool ForceInstallToCurrentDevice(LibraryRow? row)
+    {
+        var queue = SelectedDevice;
+        if (queue is null || row is null || row.IsGroup) return false;
+        return TryEnqueueRowAsync(queue, row, forceInstall: true);
+    }
+
     /// <summary>
     /// 统一的"取消排队/在跑任务"入口（2026-11-01 用户要求复用接口）：
     /// 资料库双击、队列双击、工具栏按钮都调这里；具体行为由 <see cref="QueueService.Cancel"/> 决定（07 §9 矩阵）。
@@ -3239,27 +3329,28 @@ internal sealed class MainViewModel : ObservableObject
 
         if (job.Status != QueueStatus.Done) return;
 
-        EnqueueUninstall(queue, job.BundleId, job.FileName);
+        EnqueueUninstall(queue, job.BundleId, job.DisplayNameText);
     }
 
     /// <summary>
     /// 卸载入队（队列双击 / 设备应用双击共用）：不做 Probe，检查交给 QueueService。
     /// </summary>
-    internal void EnqueueUninstall(DeviceQueueViewModel queue, string bundleId, string displayName)
+    internal bool EnqueueUninstall(DeviceQueueViewModel queue, string bundleId, string displayName)
     {
         var enqueued = _queue.Enqueue(queue.Device.Udid, JobKind.Uninstall, bundleId,
-            filePath: null, packageKey: null, packageVersion: null);
+            filePath: null, packageKey: null, packageVersion: null,
+            packageDisplayName: string.IsNullOrWhiteSpace(displayName) ? null : displayName);
         if (enqueued.Disposition == EnqueueDisposition.AlreadyRunning)
         {
             ReportStatus($"[{queue.Device.ShortName}] 卸载已在队列中：{bundleId}");
-            return;
+            return false;
         }
 
         if (enqueued.Disposition == EnqueueDisposition.KindConflict)
         {
             AppendLog($"已拒绝卸载请求：{bundleId} 在队列中仍有安装任务（{enqueued.CurrentStatus.ToText()}）", LogKind.Error, queue.Device);
             ReportError($"已拒绝卸载请求：[{queue.Device.ShortName}]，该包还有安装任务（{enqueued.CurrentStatus.ToText()}）");
-            return;
+            return false;
         }
 
         queue.AddJob(enqueued.Item);
@@ -3268,6 +3359,7 @@ internal sealed class MainViewModel : ObservableObject
         if (_isDeviceAppsMode) RefreshDeviceAppsMarkers();
         AppendLog($"已加入卸载队列：{displayName}（{bundleId}）", LogKind.End, queue.Device);
         ReportStatus($"[{queue.Device.ShortName}] 已加入卸载队列：{displayName}");
+        return true;
     }
 
     /// <summary>设备应用行双击：卸载该 BundleId（与队列双击同一个入队接口）。</summary>
@@ -3276,6 +3368,66 @@ internal sealed class MainViewModel : ObservableObject
         var queue = SelectedDevice;
         if (queue is null) return;
         EnqueueUninstall(queue, row.BundleId, row.Name);
+    }
+
+    /// <summary>切换设备应用页多选；只在设备应用视图使用。</summary>
+    public void ToggleDeviceAppsMultiSelectMode()
+    {
+        IsDeviceAppsMultiSelectMode = !IsDeviceAppsMultiSelectMode;
+        if (!IsDeviceAppsMultiSelectMode) ClearDeviceAppsSelection();
+        NotifyDeviceAppsSelectionChanged();
+    }
+
+    /// <summary>设备应用单击：多选模式下切换该行选中，返回 true 表示已处理。</summary>
+    public bool ToggleDeviceAppMultiSelect(DeviceAppRow row)
+    {
+        if (!IsDeviceAppsMultiSelectMode) return false;
+        row.IsMultiSelected = !row.IsMultiSelected;
+        NotifyDeviceAppsSelectionChanged();
+        return true;
+    }
+
+    public void SelectAllDeviceApps()
+    {
+        if (!IsDeviceAppsMultiSelectMode) return;
+        foreach (var row in DeviceApps) row.IsMultiSelected = true;
+        NotifyDeviceAppsSelectionChanged();
+    }
+
+    public void ClearDeviceAppsSelection()
+    {
+        foreach (var row in DeviceApps)
+            if (row.IsMultiSelected) row.IsMultiSelected = false;
+        NotifyDeviceAppsSelectionChanged();
+    }
+
+    /// <summary>退出设备应用多选并清空选择（切走视图 / 换设备时调用）。</summary>
+    public void ExitDeviceAppsMultiSelect()
+    {
+        IsDeviceAppsMultiSelectMode = false;
+        ClearDeviceAppsSelection();
+    }
+
+    /// <summary>批量卸载：所有选中行复用同一个卸载入队接口，不复制 QueueService 逻辑。</summary>
+    public void UninstallSelectedDeviceApps()
+    {
+        var queue = SelectedDevice;
+        if (queue is null) return;
+        var selected = DeviceApps
+            .Where(r => r.IsMultiSelected)
+            .GroupBy(r => r.BundleId, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+        if (selected.Count == 0) return;
+
+        var accepted = selected.Count(row => EnqueueUninstall(queue, row.BundleId, row.Name));
+        ClearDeviceAppsSelection();
+        IsDeviceAppsMultiSelectMode = false;
+        var rejected = selected.Count - accepted;
+        AppendLog($"批量卸载：已提交 {accepted} 个 App" +
+                  (rejected > 0 ? $"，拒绝 {rejected} 个" : ""), LogKind.End, queue.Device);
+        ReportStatus($"[{queue.Device.ShortName}] 批量卸载：已提交 {accepted} 个 App" +
+                     (rejected > 0 ? $"，拒绝 {rejected} 个" : ""));
     }
 
     /// <summary>刷新当前设备“设备应用”列表（只取已回读的用户 App，不含系统 App）。</summary>
@@ -3309,12 +3461,17 @@ internal sealed class MainViewModel : ObservableObject
 
     private async Task RefreshDeviceAppsAsync()
     {
+        // 先让切换动作回到消息循环：设备应用页先显示出来，再构建行与取图标，
+        // 避免设备 App 较多时切换按钮看起来“卡住”。
+        await Task.Yield();
+
         var queue = SelectedDevice;
         if (queue is null)
         {
             DeviceApps.Clear();
             _deviceAppsSignature = "";
             DeviceAppsCountText = "设备应用：无设备";
+            ExitDeviceAppsMultiSelect();
             return;
         }
 
@@ -3324,6 +3481,15 @@ internal sealed class MainViewModel : ObservableObject
             DeviceApps.Clear();
             _deviceAppsSignature = "";
             DeviceAppsCountText = "设备应用：正在读取…";
+            ExitDeviceAppsMultiSelect();
+            if (_deviceAppsPrefetching.TryAdd(queue.Device.Udid, 0))
+            {
+                _ = SafeFireAndForget.Run(async () =>
+                {
+                    try { await PrefetchInstalledAsync(queue.Device.Udid); }
+                    finally { _deviceAppsPrefetching.TryRemove(queue.Device.Udid, out _); }
+                }, "设备应用回读");
+            }
             return;
         }
 
@@ -3337,10 +3503,8 @@ internal sealed class MainViewModel : ObservableObject
         var cts = new CancellationTokenSource();
         _deviceAppsCts = cts;
 
-        DeviceApps.Clear();
-        _deviceAppsSignature = signature;
-
-        var rows = installed
+        // 行构建放到后台；UI 线程只做一次集合替换。旧行在构建期间保留，避免切页时闪空表。
+        var rows = await Task.Run(() => installed
             .Select(a => new DeviceAppRow
             {
                 BundleId = a.BundleId,
@@ -3348,8 +3512,13 @@ internal sealed class MainViewModel : ObservableObject
                 VersionText = a.VersionKnown ? a.Version : "版本未知",
             })
             .OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+            .ToList(), cts.Token).ConfigureAwait(true);
+        if (cts.IsCancellationRequested || !ReferenceEquals(SelectedDevice, queue)) return;
+
+        DeviceApps.Clear();
         foreach (var row in rows) DeviceApps.Add(row);
+        _deviceAppsSignature = signature;
+        ClearDeviceAppsSelection();
         DeviceAppsCountText = $"设备应用：{rows.Count} 个";
         RefreshDeviceAppsMarkers();
 
@@ -3406,7 +3575,7 @@ internal sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>把一行 IPA 加入指定设备队列（单包入队与双击入队共用；入队检查见 docs/07 §12）。</summary>
-    private bool TryEnqueueRowAsync(DeviceQueueViewModel queue, LibraryRow ipa, bool fileExistsChecked = false)
+    private bool TryEnqueueRowAsync(DeviceQueueViewModel queue, LibraryRow ipa, bool fileExistsChecked = false, bool forceInstall = false)
     {
         // 入队前提：包已解析出 BundleId（07 §2）；解析失败不允许入队
         if (string.IsNullOrWhiteSpace(ipa.BundleId))
@@ -3426,12 +3595,18 @@ internal sealed class MainViewModel : ObservableObject
         // 2026-11-05 用户定：瞬间入队——设备在线/身份、文件可读、空间检查全部延后到
         // QueueService 的泵内（安装前复用 Probe / ReadbackService）；这里只做内存检查。
         // 版本前置校验仍保留（纯内存，用的是刷新时已知的设备版本）。
-        if (VersionRules.CheckMinimumOs(ipa.MinOs, queue.Device.Version) is { } minOsError)
+        if (!forceInstall &&
+            VersionRules.CheckMinimumOs(ipa.MinOs, queue.Device.Version) is { } minOsError)
         {
             AppendLog($"拒绝入队：{ipa.NameText} {minOsError}" +
-                      "（未上传；本期不提供强制安装，需换包或改包）", LogKind.Error, queue.Device);
+                      "（未上传；可右键该行使用强制安装）", LogKind.Error, queue.Device);
             ReportStatus($"已拒绝：{ipa.NameText} {minOsError}");
             return false;
+        }
+        if (forceInstall)
+        {
+            AppendLog($"强制安装：{ipa.NameText}（跳过最低 iOS 与空间检查）", LogKind.End, queue.Device);
+            ReportStatus($"[{queue.Device.ShortName}] 强制安装：{ipa.NameText}");
         }
 
         // 覆盖安装：2026-11-01 用户决定不再提示、不弹确认（“老 iOS 没什么重要数据”）。
@@ -3444,7 +3619,11 @@ internal sealed class MainViewModel : ObservableObject
             packageKey: ipa.FilePath,
             packageVersion: ipa.PackageVersionForQueue,   // 版本未知给 null（审核 P2-2）
             expectedUncompressedBytes: ipa.AppSize > 0 ? ipa.AppSize : null,
-            packageMinOs: string.IsNullOrWhiteSpace(ipa.MinOs) ? null : ipa.MinOs);
+            packageMinOs: string.IsNullOrWhiteSpace(ipa.MinOs) ? null : ipa.MinOs,
+            packageDisplayName: string.IsNullOrWhiteSpace(ipa.Name) ? null : ipa.Name,
+            packageOriginText: string.IsNullOrWhiteSpace(ipa.OriginText) ? null : ipa.OriginText,
+            packageDeviceFamilyText: string.IsNullOrWhiteSpace(ipa.DeviceFamilyText) ? null : ipa.DeviceFamilyText,
+            forceInstall: forceInstall);
 
         switch (enqueued.Disposition)
         {

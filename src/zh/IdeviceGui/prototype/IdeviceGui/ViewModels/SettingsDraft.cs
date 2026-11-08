@@ -47,6 +47,9 @@ internal sealed class SettingsDraft
     public int AutoRetryAttempts { get; set; } = 2;
     public IReadOnlyList<DeviceInfoFieldSetting> DeviceFields { get; set; } = DeviceInfoFields.Default;
 
+    // ── 队列 ──
+    public IReadOnlyList<QueueColumnSetting> QueueColumns { get; set; } = IdeviceGui.Services.QueueColumns.Default;
+
     /// <summary>深拷贝（"取消/回滚"用）。</summary>
     public SettingsDraft Clone() => new()
     {
@@ -73,6 +76,7 @@ internal sealed class SettingsDraft
         ReconnectStableSeconds = ReconnectStableSeconds,
         AutoRetryAttempts = AutoRetryAttempts,
         DeviceFields = DeviceFields.ToList(),
+        QueueColumns = QueueColumns.ToList(),
     };
 
     internal static SearchScope CloneScope(SearchScope source)
@@ -122,6 +126,9 @@ internal sealed class SettingsDraft
                 AutoRetryAttempts = 2;
                 DeviceFields = DeviceInfoFields.Default;
                 break;
+            case SettingsGroup.Queue:
+                QueueColumns = IdeviceGui.Services.QueueColumns.Default;
+                break;
         }
     }
 }
@@ -135,4 +142,5 @@ internal enum SettingsGroup
     Log,
     Layout,
     Device,
+    Queue,
 }

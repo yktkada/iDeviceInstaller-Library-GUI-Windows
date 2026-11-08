@@ -48,6 +48,7 @@ internal partial class SettingsWindow : Window
     };
 
     private readonly ObservableCollection<FieldItem> _fields = new();
+    private readonly ObservableCollection<QueueFieldItem> _queueFields = new();
     private readonly List<(SearchField Field, System.Windows.Controls.CheckBox Box)> _scopeBoxes = new();
     private readonly Dictionary<string, bool> _initialColumnVisibility = new(StringComparer.Ordinal);
     private readonly List<(string Key, System.Windows.Controls.CheckBox Box)> _columnBoxes = new();
@@ -224,6 +225,11 @@ internal partial class SettingsWindow : Window
             foreach (var setting in _draft.DeviceFields.OrderBy(f => f.Order))
                 _fields.Add(new FieldItem(setting.Field, setting.Visible));
             FieldsList.ItemsSource = _fields;
+
+            _queueFields.Clear();
+            foreach (var setting in _draft.QueueColumns.OrderBy(f => f.Order))
+                _queueFields.Add(new QueueFieldItem(setting.Column, setting.Visible));
+            QueueFieldsList.ItemsSource = _queueFields;
         }
         finally
         {
@@ -273,6 +279,9 @@ internal partial class SettingsWindow : Window
 
         _draft.DeviceFields = _fields
             .Select((item, index) => new DeviceInfoFieldSetting(item.Field, item.Visible, index))
+            .ToList();
+        _draft.QueueColumns = _queueFields
+            .Select((item, index) => new QueueColumnSetting(item.Column, item.Visible, index))
             .ToList();
     }
 
@@ -426,6 +435,26 @@ internal partial class SettingsWindow : Window
         SchedulePreview();
     }
 
+    private void OnQueueFieldCheckChanged(object sender, RoutedEventArgs e) => Changed();
+
+    private void OnQueueFieldUpClick(object sender, RoutedEventArgs e) => MoveQueueField(-1);
+
+    private void OnQueueFieldDownClick(object sender, RoutedEventArgs e) => MoveQueueField(1);
+
+    private void MoveQueueField(int delta)
+    {
+        var index = QueueFieldsList.SelectedIndex;
+        var target = index + delta;
+        if (index < 0 || target < 0 || target >= _queueFields.Count) return;
+
+        var item = _queueFields[index];
+        _queueFields.Move(index, target);
+        QueueFieldsList.SelectedIndex = target;
+        ReadControlsToDraft();
+        _dirty = true;
+        SchedulePreview();
+    }
+
     private void OnOkClick(object sender, RoutedEventArgs e)
         => SafeFireAndForget.RunHandler(async () =>
         {
@@ -522,6 +551,26 @@ internal partial class SettingsWindow : Window
             DeviceInfoField.Ecid => "ECID",
             _ => Field.ToString(),
         };
+
+        public bool Visible
+        {
+            get => _visible;
+            set => SetProperty(ref _visible, value);
+        }
+    }
+
+    private sealed class QueueFieldItem : ObservableObject
+    {
+        private bool _visible;
+
+        public QueueFieldItem(QueueColumn column, bool visible)
+        {
+            Column = column;
+            _visible = visible;
+        }
+
+        public QueueColumn Column { get; }
+        public string Name => QueueColumns.Header(Column);
 
         public bool Visible
         {

@@ -437,6 +437,8 @@ public partial class MainWindow : Window
     {
         if (_vm is null) return;
         var isGroupRow = _contextRow?.IsGroup == true || SelectedLibraryRow?.IsGroup == true;
+        var hasFileRow = _contextRow is { IsGroup: false } || SelectedLibraryRow is { IsGroup: false };
+        SingleForceInstallMenu.Visibility = hasFileRow ? Visibility.Visible : Visibility.Collapsed;
         SingleJoinGroupMenu.Visibility = isGroupRow ? Visibility.Collapsed : Visibility.Visible;
         SingleNewGroupMenu.Visibility = isGroupRow ? Visibility.Collapsed : Visibility.Visible;
         SingleManageGroupsMenu.Visibility = isGroupRow ? Visibility.Collapsed : Visibility.Visible;
@@ -462,6 +464,13 @@ public partial class MainWindow : Window
 
     /// <summary>右键目标行：优先本次右键命中的行，其次当前选中行。</summary>
     private LibraryRow? ContextRow => _contextRow ?? SelectedLibraryRow;
+
+    private void OnForceInstallClick(object sender, RoutedEventArgs e)
+    {
+        var row = ContextRow;
+        if (row is null || row.IsGroup) return;
+        _vm?.ForceInstallToCurrentDevice(row);
+    }
 
     private void OnCopyBundleId(object sender, RoutedEventArgs e) => CopyToClipboard(LibraryCopy.BundleId(ContextRow), "BundleId");
     private void OnCopyName(object sender, RoutedEventArgs e) => CopyToClipboard(LibraryCopy.Name(ContextRow), "名称");
@@ -1088,6 +1097,23 @@ public partial class MainWindow : Window
         ApplyLeftMode();
     }
 
+    private void OnToggleDeviceAppsMultiSelectClick(object sender, RoutedEventArgs e)
+    {
+        if (_vm is null) return;
+        ClearDeviceAppArmed();
+        _vm.ToggleDeviceAppsMultiSelectMode();
+        DeviceAppsGrid.SelectedItem = null;
+    }
+
+    private void OnUninstallSelectedDeviceAppsClick(object sender, RoutedEventArgs e)
+        => _vm?.UninstallSelectedDeviceApps();
+
+    private void OnSelectAllDeviceAppsClick(object sender, RoutedEventArgs e)
+        => _vm?.SelectAllDeviceApps();
+
+    private void OnClearDeviceAppsSelectionClick(object sender, RoutedEventArgs e)
+        => _vm?.ClearDeviceAppsSelection();
+
     private void ApplyLeftMode()
     {
         var deviceMode = _vm?.IsDeviceAppsMode == true;
@@ -1102,20 +1128,45 @@ public partial class MainWindow : Window
         AdvancedFilterButton.Visibility = libraryControls;
         CompatFilterCombo.Visibility = libraryControls;
         LibraryCount.Visibility = libraryControls;
+        MultiSelectButton.Visibility = libraryControls;
+        GroupFilterCombo.Visibility = libraryControls;
+        DeviceAppsToolbar.Visibility = deviceMode ? Visibility.Visible : Visibility.Collapsed;
         LibraryGrid.Visibility = deviceMode ? Visibility.Collapsed : Visibility.Visible;
         DeviceAppsGrid.Visibility = deviceMode ? Visibility.Visible : Visibility.Collapsed;
-        if (!deviceMode) ClearDeviceAppArmed();
+        if (!deviceMode)
+        {
+            ClearDeviceAppArmed();
+            _vm?.ExitDeviceAppsMultiSelect();
+        }
     }
 
     private DeviceAppRow? _deviceAppArmed;
     private long _deviceAppArmedAtMs;
     private DispatcherTimer? _deviceAppArmedTimer;
 
+    // 设备应用拖动多选：与资料库共用 VM 的范围选择接口。
+    private DeviceAppRow? _deviceAppDragCandidate;
+    private System.Windows.Point _deviceAppDragStartPoint;
+    private bool _deviceAppDragMoved;
+
     private void OnDeviceAppsPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (_vm is null) return;
         var row = FindDataContext<DeviceAppRow>(e.OriginalSource);
         if (row is null) return;
+
+        // 设备应用页多选：与资料库同样的拖动范围选择；未拖动时在 MouseUp 才切换选中。
+        if (_vm.IsDeviceAppsMultiSelectMode)
+        {
+            ClearDeviceAppArmed();
+            DeviceAppsGrid.SelectedItem = null;
+            _deviceAppDragCandidate = row;
+            _deviceAppDragStartPoint = e.GetPosition(DeviceAppsGrid);
+            _deviceAppDragMoved = false;
+            DeviceAppsGrid.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
 
         var now = Environment.TickCount64;
         if (ReferenceEquals(row, _deviceAppArmed) && DoubleClickState.IsSecondClick(_deviceAppArmedAtMs, now))
@@ -1134,6 +1185,124 @@ public partial class MainWindow : Window
         _deviceAppArmedTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DoubleClickState.WindowMs) };
         _deviceAppArmedTimer.Tick += (_, _) => ClearDeviceAppArmed();
         _deviceAppArmedTimer.Start();
+    }
+
+    private void OnDeviceAppsPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_vm is null) return;
+        var row = FindDataContext<DeviceAppRow>(e.OriginalSource);
+        if (row is null)
+        {
+            DeviceAppsGrid.ContextMenu = null;
+            return;
+        }
+
+        // 右键行本身也参与多选：多选模式下右键未选中项先选中，再给出“卸载选中”。
+        if (_vm.IsDeviceAppsMultiSelectMode && !row.IsMultiSelected)
+        {
+            _vm.ToggleDeviceAppMultiSelect(row);
+            RefreshDeviceAppsSelectionBindings();
+        }
+
+        DeviceAppsGrid.ContextMenu = BuildDeviceAppsContextMenu(row);
+        DeviceAppsGrid.ContextMenu.PlacementTarget = DeviceAppsGrid;
+        DeviceAppsGrid.ContextMenu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private ContextMenu BuildDeviceAppsContextMenu(DeviceAppRow row)
+    {
+        var menu = new ContextMenu();
+        var single = new MenuItem { Header = "卸载此应用" };
+        single.Click += (_, _) => _vm?.UninstallDeviceApp(row);
+        menu.Items.Add(single);
+
+        if (_vm?.IsDeviceAppsMultiSelectMode == true)
+        {
+            var selected = _vm.DeviceAppsSelectedCount;
+            var batch = new MenuItem
+            {
+                Header = $"卸载选中 ({selected})",
+                IsEnabled = selected > 0,
+            };
+            batch.Click += (_, _) => _vm?.UninstallSelectedDeviceApps();
+            menu.Items.Add(batch);
+
+            menu.Items.Add(new Separator());
+            var all = new MenuItem { Header = "全选" };
+            all.Click += (_, _) =>
+            {
+                _vm?.SelectAllDeviceApps();
+                RefreshDeviceAppsSelectionBindings();
+            };
+            menu.Items.Add(all);
+            var clear = new MenuItem { Header = "取消选择" };
+            clear.Click += (_, _) =>
+            {
+                _vm?.ClearDeviceAppsSelection();
+                RefreshDeviceAppsSelectionBindings();
+            };
+            menu.Items.Add(clear);
+        }
+        else
+        {
+            menu.Items.Add(new Separator());
+            var multi = new MenuItem { Header = "进入多选模式" };
+            multi.Click += (_, _) =>
+            {
+                if (_vm is null) return;
+                _vm.ToggleDeviceAppsMultiSelectMode();
+                RefreshDeviceAppsSelectionBindings();
+            };
+            menu.Items.Add(multi);
+        }
+
+        return menu;
+    }
+
+    private void RefreshDeviceAppsSelectionBindings()
+    {
+        // 属性通知由 VM 发出；这里只清掉 DataGrid 的系统选中态，避免蓝底与自绘蓝底叠在一起。
+        DeviceAppsGrid.SelectedItem = null;
+    }
+
+    private void OnDeviceAppsPreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_deviceAppDragCandidate is null || e.LeftButton != MouseButtonState.Pressed || _vm is null) return;
+        var pos = e.GetPosition(DeviceAppsGrid);
+        if (!_deviceAppDragMoved)
+        {
+            if (Math.Abs(pos.X - _deviceAppDragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(pos.Y - _deviceAppDragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+            if (!_vm.BeginDeviceAppDragSelection(_deviceAppDragCandidate))
+            {
+                _deviceAppDragCandidate = null;
+                DeviceAppsGrid.ReleaseMouseCapture();
+                return;
+            }
+            _deviceAppDragMoved = true;
+        }
+
+        var current = FindRowAtPoint(DeviceAppsGrid, pos)?.Item as DeviceAppRow;
+        if (current is not null)
+        {
+            _vm.SelectDeviceAppDragRange(_deviceAppDragCandidate, current);
+            e.Handled = true;
+        }
+    }
+
+    private void OnDeviceAppsPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        var candidate = _deviceAppDragCandidate;
+        var moved = _deviceAppDragMoved;
+        _deviceAppDragCandidate = null;
+        _deviceAppDragMoved = false;
+        if (DeviceAppsGrid.IsMouseCaptured) DeviceAppsGrid.ReleaseMouseCapture();
+        if (candidate is null || _vm is null) return;
+        if (!moved) _vm.ToggleDeviceAppMultiSelect(candidate);
+        DeviceAppsGrid.SelectedItem = null;
+        e.Handled = true;
     }
 
     private void ClearDeviceAppArmed()
@@ -1242,8 +1411,11 @@ public partial class MainWindow : Window
     }
 
     private DataGridRow? FindRowAtPoint(System.Windows.Point point)
+        => FindRowAtPoint(LibraryGrid, point);
+
+    private DataGridRow? FindRowAtPoint(DataGrid grid, System.Windows.Point point)
     {
-        var hit = LibraryGrid.InputHitTest(point) as DependencyObject;
+        var hit = grid.InputHitTest(point) as DependencyObject;
         return FindAncestor<DataGridRow>(hit);
     }
 
