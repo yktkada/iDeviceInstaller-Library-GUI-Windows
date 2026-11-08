@@ -1,0 +1,8 @@
+#include <windows.h>
+
+/* Embed the application manifest into the executable:
+ *   1  = CREATEPROCESS_MANIFEST_RESOURCE_ID
+ *   24 = RT_MANIFEST
+ * The manifest carries <longPathAware>true</longPathAware>; see
+ * ideviceinstaller.manifest and the note in FORK.md. */
+1 24 "ideviceinstaller.manifest"

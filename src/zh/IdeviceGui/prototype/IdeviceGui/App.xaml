@@ -1,0 +1,6 @@
+<Application x:Class="IdeviceGui.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- 不设 StartupUri：启动要先做单实例与"程序目录可写"自检，检查不过就不建主窗口（见 App.xaml.cs） -->
+    <Application.Resources />
+</Application>

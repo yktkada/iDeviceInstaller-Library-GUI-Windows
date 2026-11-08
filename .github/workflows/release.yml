@@ -1,0 +1,60 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create (for example v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build and package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolkit = (Resolve-Path 'toolkit').Path
+          $dist = Join-Path $PWD 'dist'
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+
+          foreach ($lang in @('en', 'zh')) {
+            $proj = "src/$lang/IdeviceGui/prototype/IdeviceGui/IdeviceGui.csproj"
+            dotnet build $proj -c Release --nologo -p:ToolkitDir="$toolkit"
+            $out = "src/$lang/IdeviceGui/prototype/IdeviceGui/bin/Release/net10.0-windows"
+            $stage = Join-Path $dist "IdeviceGui-$lang-Windows"
+            Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Force -Path $stage | Out-Null
+            Copy-Item "$out\*" $stage -Recurse -Force
+            Get-ChildItem $stage -Recurse -File -Filter '*.pdb' | Remove-Item -Force
+            Copy-Item LICENSE,COPYRIGHT,THIRD_PARTY_NOTICES.md,README.md,README.zh-CN.md,ASSETS.md $stage -Force
+            Copy-Item 'toolkit\*' $stage -Recurse -Force
+            Get-ChildItem $stage -Recurse -File | ForEach-Object {
+              $rel = $_.FullName.Substring($stage.Length).TrimStart('\')
+              $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+              "$hash  $rel"
+            } | Sort-Object | Set-Content (Join-Path $stage 'SHA256SUMS.txt') -Encoding ASCII
+            Compress-Archive -Path "$stage\*" -DestinationPath (Join-Path $dist "IdeviceGui-$lang-Windows.zip") -Force
+          }
+
+      - name: Create draft GitHub release
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = if ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF -replace '^refs/tags/', '' } else { "${{ inputs.tag }}" }
+          gh release create $tag dist/*.zip --draft --title "iDeviceInstaller+Library $tag" --notes-file RELEASE_NOTES.md

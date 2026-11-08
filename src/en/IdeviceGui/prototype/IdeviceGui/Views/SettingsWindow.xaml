@@ -1,0 +1,283 @@
+﻿<Window x:Class="IdeviceGui.Views.SettingsWindow" x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Icon="/app.ico" Width="620" Height="660" MinWidth="560" MinHeight="520"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        AutomationProperties.AutomationId="SettingsWindow">
+    <!-- 生效方式（2026-11-02 用户定）：窗口内即时预览，点「OK / Apply」才写库，「Cancel / 关窗」回滚。
+         例外（2026-11-03 审查 N2）：Scan根添加/删除、列宽复位是**立即生效的动作**，不受「Cancel」影响。 -->
+    <Window.Resources>
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Margin" Value="0,10,0,4" />
+        </Style>
+        <Style x:Key="RowLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+        <Style x:Key="GroupResetButton" TargetType="Button">
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="10">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="OkButton" Content="OK" Width="76" Padding="0,3" Click="OnOkClick" IsDefault="True" />
+            <Button x:Name="ApplyButton" Content="Apply" Width="76" Padding="0,3" Margin="8,0,0,0" Click="OnApplyClick" />
+            <Button x:Name="CancelButton" Content="Cancel" Width="76" Padding="0,3" Margin="8,0,0,0" Click="OnCancelClick" IsCancel="True" />
+        </StackPanel>
+
+        <TabControl x:Name="Tabs" AutomationProperties.AutomationId="SettingsTabs">
+            <!-- Library -->
+            <TabItem Header="Library">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <Button Content="Restore defaults" Style="{StaticResource GroupResetButton}" Tag="Library" Click="OnResetGroupClick" />
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="60" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Grid row height (DIP)" Style="{StaticResource RowLabel}" />
+                            <Slider x:Name="RowHeightSlider" Grid.Column="1" Minimum="16" Maximum="48"
+                                    TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center"
+                                    ValueChanged="OnRowHeightSliderChanged" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                <TextBox x:Name="RowHeightBox" Width="52" TextChanged="OnAnyChanged" LostFocus="OnNumericLostFocus"
+                                         ToolTip="16–48 DIP; default 32 (invalid input is restored to a valid value on focus loss)" />
+                                <TextBlock Text="DIP" Margin="6,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Search delay threshold (rows)" Style="{StaticResource RowLabel}" />
+                            <TextBox x:Name="SearchRowsBox" Grid.Column="1" Width="90" HorizontalAlignment="Left"
+                                     TextChanged="OnAnyChanged" LostFocus="OnNumericLostFocus"
+                                     ToolTip="Search debounce applies only above this row count; 0–200000, default 1000" />
+                            <TextBlock Grid.Column="2" Text="rows" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Search delay (ms)" Style="{StaticResource RowLabel}" />
+                            <TextBox x:Name="SearchDelayBox" Grid.Column="1" Width="90" HorizontalAlignment="Left"
+                                     TextChanged="OnAnyChanged" LostFocus="OnNumericLostFocus"
+                                     ToolTip="0–5000, default 200; 0 = no wait" />
+                            <TextBlock Grid.Column="2" Text="ms" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Default sort" Style="{StaticResource RowLabel}" />
+                            <ComboBox x:Name="SortFieldCombo" Grid.Column="1" SelectionChanged="OnAnyChanged" />
+                            <CheckBox x:Name="SortDescendingCheck" Grid.Column="2" Content="Descending"
+                                      VerticalAlignment="Center" Margin="8,0,0,0" Click="OnAnyChanged" />
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Search match mode" Style="{StaticResource RowLabel}" />
+                            <ComboBox x:Name="MatchModeCombo" Grid.Column="1" SelectionChanged="OnAnyChanged" />
+                        </Grid>
+                        <TextBlock Text="Search scope (columns)" Style="{StaticResource SectionTitle}" />
+                        <WrapPanel x:Name="ScopePanel" Orientation="Horizontal" />
+                        <TextBlock Text="Behavior" Style="{StaticResource SectionTitle}" />
+                        <CheckBox x:Name="MergeCheck" Content="Merge same BundleId" Margin="0,2,0,2" Click="OnAnyChanged" />
+                        <CheckBox x:Name="MissingCheck" Content="Show missing files" Margin="0,2,0,2" Click="OnAnyChanged" />
+                        <CheckBox x:Name="DeviceFamilyRetinaCheck" Content="Use Retina text for device family (off = use R)" Margin="0,8,0,2" Click="OnAnyChanged" />
+                        <TextBlock Text="Column visibility" Style="{StaticResource SectionTitle}" />
+                        <WrapPanel x:Name="ColumnsPanel" Orientation="Horizontal" />
+                        <Button Content="Manage groups…" Padding="10,3" HorizontalAlignment="Left"
+                                Margin="0,12,0,0" Click="OnManageGroupsSettingsClick" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Scan -->
+            <TabItem Header="Scan">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <Button Content="Restore defaults" Style="{StaticResource GroupResetButton}" Tag="Scan" Click="OnResetGroupClick" />
+                        <TextBlock Text="Scan roots (RootN)" Style="{StaticResource SectionTitle}" />
+                        <ListBox x:Name="RootsList" Height="180" AutomationProperties.AutomationId="SettingsRootsList" />
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button Content="Add folder…" Padding="10,3" Click="OnAddRootClick"
+                                    ToolTip="Takes effect immediately: adding writes the database and scans at once, independent of Cancel" />
+                            <Button Content="Delete selected" Padding="10,3" Margin="8,0,0,0" Click="OnDeleteRootClick"
+                                    ToolTip="Takes effect immediately: also deletes package rows under that root and scans at once, independent of Cancel" />
+                            <TextBlock x:Name="RootsHint" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="#FF666666" />
+                        </StackPanel>
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Rows per batch write" Style="{StaticResource RowLabel}" />
+                            <TextBox x:Name="BatchSizeBox" Grid.Column="1" Width="90" HorizontalAlignment="Left"
+                                     TextChanged="OnAnyChanged" LostFocus="OnNumericLostFocus"
+                                     ToolTip="1–1000; default 30 (invalid input is restored to a valid value on focus loss)" />
+                        </Grid>
+                        <TextBlock Text="Note: adding or removing a scan root triggers an immediate rescan; removing also deletes that root package rows from the database. Both actions take effect immediately and are independent of Cancel."
+                                   Margin="0,10,0,0" TextWrapping="Wrap" Foreground="#FF666666" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Icons -->
+            <TabItem Header="Icons">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <Button Content="Restore defaults" Style="{StaticResource GroupResetButton}" Tag="Icons" Click="OnResetGroupClick" />
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Icon cache limit (MB)" Style="{StaticResource RowLabel}" />
+                            <TextBox x:Name="CacheMaxBox" Grid.Column="1" Width="110" HorizontalAlignment="Left"
+                                     TextChanged="OnAnyChanged" LostFocus="OnNumericLostFocus"
+                                     ToolTip="Default 2048; 64–20480 (invalid input is restored to a valid value on focus loss)" />
+                        </Grid>
+                        <CheckBox x:Name="IconMatchScaleCheck" Content="Pick the smallest sufficient size for the current scale"
+                                  Margin="0,10,0,2" Click="OnAnyChanged" />
+                        <CheckBox x:Name="IconDownscaleCheck" Content="Downscale to the cache tier when saving (off stores the original size; disk usage grows)"
+                                  Margin="0,2,0,2" Click="OnAnyChanged" />
+                        <TextBlock x:Name="IconBucketHint" Margin="0,10,0,0" Foreground="#FF666666" TextWrapping="Wrap" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Log -->
+            <TabItem Header="Log">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <Button Content="Restore defaults" Style="{StaticResource GroupResetButton}" Tag="Log" Click="OnResetGroupClick" />
+                        <CheckBox x:Name="LogToFileCheck" Content="Write the file log logs\app.log (off by default; crash.log is always written)"
+                                  Margin="0,6,0,2" Click="OnAnyChanged" />
+                        <CheckBox x:Name="LogDetailCheck" Content="Log panel: verbose mode (concise by default)"
+                                  Margin="0,2,0,2" Click="OnAnyChanged" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Layout -->
+            <TabItem Header="Layout">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <Button Content="Restore defaults" Style="{StaticResource GroupResetButton}" Tag="Layout" Click="OnResetGroupClick" />
+                        <CheckBox x:Name="LogHiddenCheck" Content="Hide log pane" Margin="0,6,0,2" Click="OnAnyChanged" />
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Maximize log overlay width" Style="{StaticResource RowLabel}" />
+                            <TextBox x:Name="OverlayWidthBox" Grid.Column="1" Width="90" HorizontalAlignment="Left"
+                                     TextChanged="OnAnyChanged" LostFocus="OnNumericLostFocus"
+                                     ToolTip="260–900; default 420 (invalid input is restored to a valid value on focus loss)" />
+                        </Grid>
+                        <Button Content="Restore default three-pane proportions" Padding="10,3" Margin="0,14,0,0" HorizontalAlignment="Left"
+                                Click="OnResetColumnsClick"
+                                ToolTip="Takes effect immediately: independent of Cancel" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Devices -->
+            <TabItem Header="Devices">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <Button Content="Restore defaults" Style="{StaticResource GroupResetButton}" Tag="Device" Click="OnResetGroupClick" />
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Online poll interval (seconds)" Style="{StaticResource RowLabel}" />
+                            <TextBox x:Name="PollSecondsBox" Grid.Column="1" Width="70" HorizontalAlignment="Left"
+                                     TextChanged="OnAnyChanged" LostFocus="OnNumericLostFocus"
+                                     ToolTip="1–10; default 2 (invalid input is restored to a valid value on focus loss)" />
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Connection stability window (seconds)" Style="{StaticResource RowLabel}" />
+                            <TextBox x:Name="StableSecondsBox" Grid.Column="1" Width="70" HorizontalAlignment="Left"
+                                     TextChanged="OnAnyChanged" LostFocus="OnNumericLostFocus"
+                                     ToolTip="1–10; default 3; the timer restarts if the device disconnects again" />
+                        </Grid>
+                        <CheckBox x:Name="AutoResumeCheck" Content="Auto-resume once the connection is stable (on by default)" Margin="0,10,0,2" Click="OnAnyChanged" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Automatic attempt count" Style="{StaticResource RowLabel}" />
+                            <TextBox x:Name="AutoRetryAttemptsBox" Grid.Column="1" Width="70" HorizontalAlignment="Left"
+                                     TextChanged="OnAnyChanged" LostFocus="OnNumericLostFocus"
+                                     ToolTip="2–5; default 2 (including the first); a job is re-enqueued automatically after each failure and marked failed once the count is reached" />
+                        </Grid>
+                        <TextBlock Text="Device info fields (order / visibility)" Style="{StaticResource SectionTitle}" />
+                        <ListBox x:Name="FieldsList" Height="180" AutomationProperties.AutomationId="SettingsFieldsList">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding Name}" IsChecked="{Binding Visible, Mode=TwoWay}"
+                                              Checked="OnFieldCheckChanged" Unchecked="OnFieldCheckChanged" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button Content="Move up" Padding="10,3" Click="OnFieldUpClick" />
+                            <Button Content="Move down" Padding="10,3" Margin="8,0,0,0" Click="OnFieldDownClick" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- 关于：固定英文，不参与Apply / Cancel / Restore defaults（2026-11-08） -->
+            <TabItem Header="About">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <TextBlock Text="iDeviceInstaller+Library GUI For Windows"
+                                   FontSize="16" FontWeight="Bold" TextWrapping="Wrap" />
+                        <TextBlock Text="IPA Library &amp; Installer for Legacy iOS Devices"
+                                   Margin="0,4,0,12" Foreground="#FF555555" TextWrapping="Wrap" />
+                        <TextBlock TextWrapping="Wrap" LineHeight="20">
+                            A powerful IPA library manager and installer for legacy iOS devices on Windows.
+                        </TextBlock>
+                        <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" LineHeight="20">
+                            Performance-tested with a 50,000+ IPA library.
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" LineHeight="20">Advanced compatibility filtering.</TextBlock>
+                        <TextBlock TextWrapping="Wrap" LineHeight="20">Intelligent multi-device installation queues.</TextBlock>
+                        <TextBlock x:Name="AboutVersionText" Margin="0,16,0,0" TextWrapping="Wrap" />
+                        <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" LineHeight="20">
+                            Supported: iOS 4 / 6 / 7 / 8 and iPad.
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" LineHeight="20">Newer iOS devices are not officially supported.</TextBlock>
+                        <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" LineHeight="20">
+                            Unofficial third-party tool. Not affiliated with Apple Inc.
+                        </TextBlock>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

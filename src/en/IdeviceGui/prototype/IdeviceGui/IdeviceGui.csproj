@@ -1,0 +1,94 @@
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="ValidateToolkit">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>IdeviceGui</AssemblyName>
+    <RootNamespace>IdeviceGui</RootNamespace>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- 工具链来源目录：构建时把 exe 与 DLL 一并复制到输出目录，
+         运行时不需要 msys2，也不依赖外部路径存在。可用 -p:ToolkitDir=... 覆盖（docs/10 §3.1）。 -->
+    <ToolkitDir Condition="'$(ToolkitDir)' == '' and Exists('$(RepoToolkitDir)\ideviceinstaller.exe')">$(RepoToolkitDir)</ToolkitDir>
+    <ToolkitDir Condition="'$(ToolkitDir)' == ''"></ToolkitDir>
+    <!-- AfcHelper 工程的输出目录（net10.0，与控制台工程的 TFM 一致） -->
+    <AfcHelperOutputDir Condition="'$(AfcHelperOutputDir)' == ''">$(MSBuildThisFileDirectory)..\..\AfcHelper\bin\$(Configuration)\net10.0\</AfcHelperOutputDir>
+    <IconHelperOutputDir Condition="'$(IconHelperOutputDir)' == ''">$(MSBuildThisFileDirectory)..\IdeviceIconHelper\bin\$(Configuration)\net10.0\</IconHelperOutputDir>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(ToolkitDir)' != ''">
+    <None Include="$(ToolkitDir)\*.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(ToolkitDir)\ideviceinstaller.exe;$(ToolkitDir)\idevice_id.exe;$(ToolkitDir)\ideviceinfo.exe;$(ToolkitDir)\idevicediagnostics.exe" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- B7 / M2：SQLite（docs/09 §3.1）。原生库 e_sqlite3.dll 随程序目录一起分发
+       （2026-10-29 用户拍板，docs/10 §3.3）：构建后把包里的 win-x64 原生 dll 复制到输出根目录，
+       不依赖系统装 SQLite，也不写用户目录。 -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
+  </ItemGroup>
+
+  <Target Name="CopySqliteNativeToOutput" AfterTargets="Build">
+    <!-- 原生库由 SDK 落到 runtimes\win-x64\native\；再复制一份到输出根目录，
+         与工具链同一做法（docs/10 §3.3），发布时整个程序目录拷走即可。 -->
+    <ItemGroup>
+      <SqliteNativeFiles Include="$(OutDir)runtimes\win-x64\native\e_sqlite3.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SqliteNativeFiles)" DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" Condition="Exists('%(SqliteNativeFiles.FullPath)')" />
+    <Warning Condition="!Exists('%(SqliteNativeFiles.FullPath)')"
+             Text="找不到 e_sqlite3.dll（%(SqliteNativeFiles.FullPath)）：库将无法打开。请检查 SQLitePCLRaw 包的 win-x64 原生资产。" />
+  </Target>
+
+  <!-- B6 测试基座：只对单元测试工程开放 internal —— 测试引用真实程序集，不复制源码 -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="IdeviceGui.Tests" />
+  </ItemGroup>
+
+  <!-- 工具链缺失要"构建时就报错"，而不是构建成功、运行时才炸（B5）。
+       InitialTargets 保证它先于任何复制动作执行，否则只会看到一堆 MSB3030 复制错误，
+       看不出真正原因是 ToolkitDir 指错了。这样 -p:ToolkitDir=<目录> 覆盖是否生效也立刻可见。 -->
+  <Target Name="ValidateToolkit" Condition="'$(ToolkitDir)' != ''">
+    <Error Condition="!Exists('$(ToolkitDir)\ideviceinstaller.exe')"
+           Text="找不到工具链：$(ToolkitDir)\ideviceinstaller.exe。请用 -p:ToolkitDir=&lt;工具链目录&gt; 指定（docs/10 §3.1）。" />
+    <Error Condition="!Exists('$(ToolkitDir)\libimobiledevice-1.0.dll')"
+           Text="工具链缺少 libimobiledevice-1.0.dll：$(ToolkitDir)。AFC helper 与设备访问都依赖它。" />
+  </Target>
+
+  <!-- AfcHelper 是独立进程（主程序不直接 P/Invoke AFC，总览 §6.4）：
+       引用是为了保证构建顺序，ReferenceOutputAssembly=false 避免把它的 dll 当引用程序集；
+       下面再用显式 Target 把 apphost exe 拷到输出目录，保证与主程序同目录（docs/10 §3.3）。 -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\AfcHelper\AfcHelper.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <SkipGetTargetFrameworkProperties>false</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
+    <ProjectReference Include="..\IdeviceIconHelper\IdeviceIconHelper.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="CopyIconHelperToOutput" AfterTargets="Build">
+    <ItemGroup>
+      <IconHelperFiles Include="$(IconHelperOutputDir)IdeviceIconHelper.exe;$(IconHelperOutputDir)IdeviceIconHelper.dll;$(IconHelperOutputDir)IdeviceIconHelper.runtimeconfig.json;$(IconHelperOutputDir)IdeviceIconHelper.deps.json" />
+    </ItemGroup>
+    <Warning Condition="!Exists('$(IconHelperOutputDir)IdeviceIconHelper.exe')"
+             Text="IdeviceIconHelper.exe 未找到（$(IconHelperOutputDir)）：设备图标将不可用。" />
+    <Copy SourceFiles="@(IconHelperFiles)" DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" Condition="Exists('$(IconHelperOutputDir)IdeviceIconHelper.exe')" />
+  </Target>
+
+  <Target Name="CopyAfcHelperToOutput" AfterTargets="Build">
+    <ItemGroup>
+      <AfcHelperFiles Include="$(AfcHelperOutputDir)AfcHelper.exe;$(AfcHelperOutputDir)AfcHelper.dll;$(AfcHelperOutputDir)AfcHelper.runtimeconfig.json" />
+    </ItemGroup>
+    <Warning Condition="!Exists('$(AfcHelperOutputDir)AfcHelper.exe')"
+             Text="AfcHelper.exe 未找到（$(AfcHelperOutputDir)）：AFC 清理与空间查询将不可用。" />
+    <Copy SourceFiles="@(AfcHelperFiles)" DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" Condition="Exists('$(AfcHelperOutputDir)AfcHelper.exe')" />
+  </Target>
+  <ItemGroup>
+    <Resource Include="app.ico" />
+  </ItemGroup>
+</Project>

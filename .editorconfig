@@ -1,0 +1,24 @@
+# 最小 .editorconfig（2026-11-03 T5）：只定"不会争论"的格式项；
+# 代码风格/命名规则先不进构建（Directory.Build.props 里 EnforceCodeStyleInBuild=false）。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+[*.{md,json,yml,yaml}]
+indent_size = 2
+trim_trailing_whitespace = false
+
+[*.{csproj,props,targets,xml}]
+indent_size = 2
+
+[*.cs]
+# 现有代码风格（观察结论，先只做记录，不强制）
+csharp_style_namespace_declarations = file_scoped:suggestion
+dotnet_style_qualification_for_field = false:suggestion

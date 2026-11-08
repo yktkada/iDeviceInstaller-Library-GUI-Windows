@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>IdeviceIconHelper</AssemblyName>
+    <ToolkitDir Condition="'$(ToolkitDir)' == '' and Exists('$(RepoToolkitDir)\ideviceinstaller.exe')">$(RepoToolkitDir)</ToolkitDir>
+    <ToolkitDir Condition="'$(ToolkitDir)' == ''"></ToolkitDir>
+    <RootNamespace>IdeviceIconHelper</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(ToolkitDir)' != ''">
+    <None Include="$(ToolkitDir)\*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

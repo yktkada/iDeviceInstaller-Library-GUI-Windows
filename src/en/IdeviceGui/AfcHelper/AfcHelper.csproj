@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AfcHelper</AssemblyName>
+    <RootNamespace>AfcHelper</RootNamespace>
+    <!-- 工具链来源目录：构建时把 DLL 复制到输出目录，AfcHelper 在自己 bin 下即可独立运行，
+         不依赖 msys2，也不依赖外部路径（docs/10 §3.1）。可用 -p:ToolkitDir=... 覆盖。 -->
+    <ToolkitDir Condition="'$(ToolkitDir)' == '' and Exists('$(RepoToolkitDir)\ideviceinstaller.exe')">$(RepoToolkitDir)</ToolkitDir>
+    <ToolkitDir Condition="'$(ToolkitDir)' == ''"></ToolkitDir>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(ToolkitDir)' != ''">
+    <None Include="$(ToolkitDir)\*.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

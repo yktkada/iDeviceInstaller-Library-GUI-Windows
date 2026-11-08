@@ -1,0 +1,20 @@
+﻿<Project>
+
+  <!--
+    静态分析基线（2026-11-03 T5）：
+    - TreatWarningsAsErrors：0 警告由机器保证，不靠自觉；
+    - AnalysisLevel=latest：跟随 SDK 最新编译器警告（新的 CA 规则分批开，避免一次几千条噪音）；
+    - EnforceCodeStyleInBuild=false：格式/命名规则先不进构建，靠 .editorconfig 给 IDE；
+    - Nullable/ImplicitUsings 原先只在 csproj 里写，这里统一兜底（显式写了的不覆盖）。
+  -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <RepoToolkitDir Condition="'$(RepoToolkitDir)' == ''">$(MSBuildThisFileDirectory)toolkit</RepoToolkitDir>
+  </PropertyGroup>
+</Project>
