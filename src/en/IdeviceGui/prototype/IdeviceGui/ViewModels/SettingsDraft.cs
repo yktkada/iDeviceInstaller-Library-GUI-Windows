@@ -6,7 +6,7 @@ namespace IdeviceGui.ViewModels;
 /// <summary>
 /// 设置窗口的**草稿**（2026-11-02 用户定：窗口内即时预览、**点确定/应用才写库**，取消/关窗回滚）。
 /// <para>
-/// - 只放"可预览"的设置；列宽/列顺序、搜索框内的即时操作不在窗口里（docs/01 §2.4）。<br/>
+/// - 只放"Preview available"的设置；列宽/列顺序、搜索框内的即时操作不在窗口里（docs/01 §2.4）。<br/>
 /// - 默认值与各键默认口径见 docs/09 §3.2。
 /// </para>
 /// </summary>
@@ -50,7 +50,7 @@ internal sealed class SettingsDraft
     // ── 队列 ──
     public IReadOnlyList<QueueColumnSetting> QueueColumns { get; set; } = IdeviceGui.Services.QueueColumns.Default;
 
-    /// <summary>深拷贝（"取消/回滚"用）。</summary>
+    /// <summary>深拷贝（"Cancel/Rollback"用）。</summary>
     public SettingsDraft Clone() => new()
     {
         RowHeight = RowHeight,

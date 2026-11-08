@@ -15,9 +15,9 @@ internal enum LogMode
 /// <summary>
 /// 日志筛选规则（b3a）。
 /// <para>
-/// **口径（2026-10-31 复审 P0-1 采纳后改为"调用点显式标注类别"）**：显示与否只看 <see cref="LogKind"/>，
+/// **口径（2026-10-31 复审 P0-1 采纳后改为"Explicitly label class of call points"）**：显示与否只看 <see cref="LogKind"/>，
 /// 不再用关键词猜文案——`Start / End / Error` 显示；`Detail` 隐藏（但照常记录）。
-/// 唯一保留的文本规则是：`Detail` 行里**工具原始输出**的 `WARNING:` / `ERROR:` 也显示（用户拍板"错误与告警都显示"），
+/// 唯一保留的文本规则是：`Detail` 行里**工具原始输出**的 `WARNING:` / `ERROR:` 也显示（用户拍板"Both errors and warnings are displayed"），
 /// 以及过滤解密 IPA 安装时固定出现的两条无意义告警。
 /// </para>
 /// </summary>
@@ -60,12 +60,12 @@ internal static class LogFilter
 
         if (line.Kind is LogKind.Start or LogKind.End or LogKind.Error) return true;
 
-        // 工具原始输出里的告警/错误（Detail 类别）：用户 2026-10-31 拍板"错误与告警都显示"
+        // 工具原始输出里的告警/错误（Detail 类别）：用户 2026-10-31 拍板"Both errors and warnings are displayed"
         return line.Text.Contains("WARNING:", StringComparison.Ordinal)
             || line.Text.Contains("ERROR:", StringComparison.Ordinal);
     }
 
-    /// <summary>Settings 值 → 模式（坏值 / 空 → 简洁，符合"成品默认不吵"）。</summary>
+    /// <summary>Settings 值 → 模式（坏值 / 空 → 简洁，符合"The finished product is not noisy by default"）。</summary>
     public static LogMode ParseMode(string? raw)
     {
         var trimmed = raw?.Trim().Trim('"');

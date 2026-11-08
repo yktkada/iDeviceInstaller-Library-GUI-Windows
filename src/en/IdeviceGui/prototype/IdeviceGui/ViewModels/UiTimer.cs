@@ -4,7 +4,7 @@ namespace IdeviceGui.ViewModels;
 
 /// <summary>
 /// 只执行一次的 UI 定时器（可取消）。b3b：日志 50 ms 批量上屏、搜索输入防抖共用。
-/// 抽成接口是为了单测能注入"手动触发"的实现，不去等真实 Dispatcher 时钟。
+/// 抽成接口是为了单测能注入"manual trigger"的实现，不去等真实 Dispatcher 时钟。
 /// </summary>
 internal interface IUiTimer
 {

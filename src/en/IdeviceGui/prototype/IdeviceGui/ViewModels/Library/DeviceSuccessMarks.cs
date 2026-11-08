@@ -16,7 +16,7 @@ internal sealed class DeviceSuccessMarks
 
     private readonly Dictionary<string, HashSet<string>> _byDevice = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>每次 Add/Clear 递增（MainViewModel 的标记签名用它判断"绿色集合变过没有"）。</summary>
+    /// <summary>每次 Add/Clear 递增（MainViewModel 的标记签名用它判断"Has the green set ever changed?"）。</summary>
     internal long Version { get; private set; }
 
     /// <summary>身份键：BundleId（大小写不敏感）+ 入队版本（未知给空串）。</summary>

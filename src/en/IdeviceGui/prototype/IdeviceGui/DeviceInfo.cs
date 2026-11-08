@@ -7,7 +7,7 @@ using IdeviceGui.ViewModels.Library;
 namespace IdeviceGui;
 
 /// <summary>
-/// 一台设备的快照信息。属性可写是为了"原地更新"（01 §6.6 / 进度 §5 第 5 条：
+/// 一台设备的快照信息。属性可写是为了"Update in place"（01 §6.6 / 进度 §5 第 5 条：
 /// 刷新设备不允许 Devices.Clear() 重建，否则正在跑的泵会变孤儿）。
 /// <para>信息行（工具栏那行）按 <see cref="Fields"/> 的字段开关与顺序拼出来；默认集见
 /// <see cref="DeviceInfoFields.Default"/>（2026-11-01 用户定稿）。</para>

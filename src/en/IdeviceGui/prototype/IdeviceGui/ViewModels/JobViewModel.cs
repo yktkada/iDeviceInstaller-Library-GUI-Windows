@@ -178,7 +178,7 @@ internal sealed class JobViewModel : ObservableObject
 
     /// <summary>
     /// 安装段是否已开始（收到过第一条 `Install: <阶段> (NN%)`，**含 0%**）。
-    /// 页签条用它判"进入安装段"（审查 N9：`InstallPercent &gt; 0` 会把 `Install: … (0%)` 误当成传输段）。
+    /// 页签条用它判"Enter the installation section"（审查 N9：`InstallPercent &gt; 0` 会把 `Install: … (0%)` 误当成传输段）。
     /// </summary>
     public bool InstallStarted
     {
@@ -186,7 +186,7 @@ internal sealed class JobViewModel : ObservableObject
         private set => SetProperty(ref _installStarted, value);
     }
 
-    /// <summary>标记"安装段已开始"（不受百分比是否为 0 影响）。</summary>
+    /// <summary>标记"Installation segment has started"（不受百分比是否为 0 影响）。</summary>
     internal void NoteInstallStarted() => InstallStarted = true;
 
     /// <summary>重入队 / 回到 Pending：清掉安装段标记与百分比。</summary>

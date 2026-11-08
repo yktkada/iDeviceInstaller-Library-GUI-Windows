@@ -1,7 +1,7 @@
 namespace IdeviceGui.ViewModels.Library;
 
 /// <summary>
-/// "与当前设备兼容"（2026-11-02 用户定）：**只看设备族 + 最低 iOS**，不做完整 M5 兼容判定。
+/// "Compatible with current devices"（2026-11-02 用户定）：**只看设备族 + 最低 iOS**，不做完整 M5 兼容判定。
 /// - 设备族：包 DeviceFamily = Universal → 都行；含 iPad → 只能 iPad；含 iPhone/iPod 或 "1" → 非 iPad；含 "2" → iPad。
 /// - **设备族为空 / `unknown` / 未识别 → 按早期 iPhone OG 3.5（320×480）处理：iPhone/iPod 放行，iPad 不放行**（2026-11-05 用户定）。
 /// - iOS：包 MinOs ≤ 设备版本（数值逐段比较）；MinOs 空/坏值 → 放行。

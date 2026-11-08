@@ -28,7 +28,7 @@ internal readonly record struct BatteryUsage(int? Percent, bool Charging, bool F
 
 /// <summary>
 /// 电池健康（来源：<c>idevicediagnostics -u &lt;UDID&gt; diagnostics GasGauge</c>）。
-/// 健康度 = FullChargeCapacity / DesignCapacity；≥100% 判"不可信"（用户 2026-10-31 拍板，实测 iPod touch 5 = 101.9%）。
+/// 健康度 = FullChargeCapacity / DesignCapacity；≥100% 判"Not trustworthy"（用户 2026-10-31 拍板，实测 iPod touch 5 = 101.9%）。
 /// </summary>
 internal readonly record struct BatteryHealth(int? DesignMah, int? FullChargeMah, int? CycleCount)
 {
@@ -89,7 +89,7 @@ internal readonly record struct BatterySpec(
 }
 
 /// <summary>
-/// 解析电池相关的三个只读命令输出。全部是"解析失败就返回 Unknown"的纯函数，便于单测（fixtures/battery 是 4 台真机原文）。
+/// 解析电池相关的三个只读命令输出。全部是"If the parsing fails, Unknown is returned."的纯函数，便于单测（fixtures/battery 是 4 台真机原文）。
 /// </summary>
 internal static class BatteryInfoReader
 {

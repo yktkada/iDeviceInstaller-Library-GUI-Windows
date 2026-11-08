@@ -12,10 +12,10 @@ internal enum ProcessStopReason
     /// <summary>进程自己退出（正常结束）。</summary>
     Exited,
 
-    /// <summary>按"无输出"判卡死，已杀进程树（07 §3.3 的核心判据）。</summary>
+    /// <summary>按"No output"判卡死，已杀进程树（07 §3.3 的核心判据）。</summary>
     IdleTimeout,
 
-    /// <summary>按总时长判超时，已杀进程树（AFC helper 的"总时长 + 无输出"用）。</summary>
+    /// <summary>按总时长判超时，已杀进程树（AFC helper 的"Total duration + no output"用）。</summary>
     TotalTimeout,
 
     /// <summary>兜底硬超时：整个调用（含杀完等退出）超上限，已尽力杀进程树。</summary>
@@ -32,9 +32,9 @@ internal enum ProcessStopReason
 /// 通用子进程执行参数。看门狗语义按 07 §3.3：
 /// <list type="bullet">
 /// <item><see cref="IdleTimeout"/>：**无输出**超过该时长即判卡死（不是按总时长）。</item>
-/// <item><see cref="TotalTimeout"/>：总时长上限，到点即杀（AFC helper 这类"输出很少但要 30 s 总时长"的调用用）。</item>
-/// <item><see cref="HardTimeout"/>：兜底安全阀，涵盖杀进程后等退出的时间；防止"输出不停但永远不结束"或
-/// "杀不掉"的进程把调用方挂住。正常调用不用传。</item>
+/// <item><see cref="TotalTimeout"/>：总时长上限，到点即杀（AFC helper 这类"Very little output but 30 s total duration"的调用用）。</item>
+/// <item><see cref="HardTimeout"/>：兜底安全阀，涵盖杀进程后等退出的时间；防止"Output continues but never ends"或
+/// "Can't kill"的进程把调用方挂住。正常调用不用传。</item>
 /// </list>
 /// 超时 / 取消都只杀进程树并返回结果，不抛异常。
 /// </summary>
@@ -109,12 +109,12 @@ internal sealed class ProcessRunResult
 /// <summary>
 /// 子进程执行器：异步 + 可取消 + 按输出活动判卡死 + 超时杀进程树（07 §3.3、总览硬约束 #2 / #3）。
 /// <para>
-/// 判卡死的口径是"**多久没有新输出**"，不是"总共跑了多久"——2 GB 的包上传 10 分钟是正常的，
+/// 判卡死的口径是"**How long has it been since there was no new output**"，不是"How long did you run in total?"——2 GB 的包上传 10 分钟是正常的，
 /// 只要 <c>Transfer:</c> 还在走就不能杀。所以 install / uninstall 只传 IdleTimeout，不传 TotalTimeout。
 /// </para>
 /// <para>
 /// 超时与取消都会 <c>Kill(entireProcessTree: true)</c> 后返回 <see cref="ProcessRunResult"/>，不抛异常；
-/// 调用方负责把"超时"翻译成业务结果、把"Cancel"翻译成 <see cref="OperationCanceledException"/>。
+/// 调用方负责把"timeout"翻译成业务结果、把"Cancel"翻译成 <see cref="OperationCanceledException"/>。
 /// <see cref="KillAll"/> 是关窗兜底：保证主程序退出时没有残留的 ideviceinstaller / AfcHelper。
 /// </para>
 /// <para>线程安全：可在任意线程并发调用；每个进程独立看门狗，不设全局锁（硬约束 #3）。</para>
@@ -132,7 +132,7 @@ internal static class ProcessRunner
 
     /// <summary>
     /// 关窗兜底：把当前所有托管子进程按进程树杀掉。返回发起杀进程的次数（不代表全部杀成功）。
-    /// 正常关窗顺序是"取消 CancellationToken → await 各设备泵 → KillAll"，本方法只补最后一道。
+    /// 正常关窗顺序是"Cancel CancellationToken → await each device pump → KillAll"，本方法只补最后一道。
     /// </summary>
     public static int KillAll()
     {
@@ -156,7 +156,7 @@ internal static class ProcessRunner
         var clock = Stopwatch.StartNew();
         var stdout = new List<string>();
         var stderr = new List<string>();
-        // 输出事件在 ThreadPool 线程上触发：行列表与"最后活动时间"都要加锁 / 原子读写
+        // 输出事件在 ThreadPool 线程上触发：行列表与"Last activity time"都要加锁 / 原子读写
         var bufferGate = new object();
         var lastActivityTicks = Stopwatch.GetTimestamp();
         string? callbackError = null;
@@ -281,7 +281,7 @@ internal static class ProcessRunner
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
-            // ── 看门狗：等进程退出，同时每 PollInterval 检查一次"无输出时长 / 总时长 / 硬上限 / 取消" ──
+            // ── 看门狗：等进程退出，同时每 PollInterval 检查一次"No output duration / total duration / hard cap / cancel" ──
             var hardDeadline = options.HardTimeout is { } hardLimit ? clock.Elapsed + hardLimit : (TimeSpan?)null;
             while (true)
             {

@@ -8,7 +8,7 @@ namespace IdeviceGui.Services;
 /// <b>写 <c>&lt;程序目录&gt;\logs\crash.log</c>，覆盖写、只留最后一次</b>；同样只写程序目录。
 /// <para>
 /// 独立成类是为了能脱离 WPF 进程验证（B6 之后可单测）：路径解析在 <see cref="AppPaths"/>，
-/// 这里只负责"把最后一条异常落盘，且落盘失败绝不抛"。
+/// 这里只负责"Put the last abnormal item on the market, and never throw it if the placement fails."。
 /// </para>
 /// </summary>
 internal static class CrashReporter

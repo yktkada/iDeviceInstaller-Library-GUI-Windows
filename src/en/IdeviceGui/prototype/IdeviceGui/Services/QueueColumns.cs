@@ -91,16 +91,16 @@ internal static class QueueColumns
     public static string Header(QueueColumn column) => column switch
     {
         QueueColumn.Status => "Status",
-        QueueColumn.Note => "Note",
+        QueueColumn.Note => "Remarks",
         QueueColumn.Name => "Name",
         QueueColumn.Version => "Version",
-        QueueColumn.InstalledSize => "Installed size",
+        QueueColumn.InstalledSize => "Size after installation",
         QueueColumn.BundleId => "BundleId",
         QueueColumn.FilePath => "File path",
         QueueColumn.Origin => "Source",
         QueueColumn.MinOs => "Minimum iOS",
         QueueColumn.DeviceFamily => "Device family",
-        _ => throw new ArgumentOutOfRangeException(nameof(column), column, "队列列没有定义显示名"),
+        _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Queue column has no display name defined"),
     };
 
     public static IReadOnlyList<QueueColumnSetting> Parse(string? json)
@@ -165,7 +165,7 @@ internal static class QueueColumns
         QueueColumn.Origin => "origin",
         QueueColumn.MinOs => "minOs",
         QueueColumn.DeviceFamily => "deviceFamily",
-        _ => throw new ArgumentOutOfRangeException(nameof(column), column, "队列列没有定义持久化 id"),
+        _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Queue column has no persistence id defined"),
     };
 
     public static bool TryParseColumn(string id, out QueueColumn column)

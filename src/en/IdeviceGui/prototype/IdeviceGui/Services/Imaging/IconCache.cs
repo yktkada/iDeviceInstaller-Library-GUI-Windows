@@ -38,7 +38,7 @@ internal static class IconCachePaths
         var files = new DirectoryInfo(directory)
             .EnumerateFiles("*.png", SearchOption.TopDirectoryOnly)
             // Windows 默认关了 last-access 更新，LastAccessTimeUtc 可能一直等于创建时间；
-            // 用 LastWriteTimeUtc 做第二排序键，至少保证"先进先出"而不是随机。
+            // 用 LastWriteTimeUtc 做第二排序键，至少保证"first in first out"而不是随机。
             .OrderBy(f => f.LastAccessTimeUtc)
             .ThenBy(f => f.LastWriteTimeUtc)
             .ToList();
@@ -82,7 +82,7 @@ internal static class IconCachePaths
     /// <summary>
     /// **按引用计数清理**（用户 2026-10-29 拍板）：
     /// 只有缓存目录里、但**当前没有任何 `Packages` 行引用**的 png 才会被删——包括
-    /// "包被删了""包被替换了（sha1 变了）""图标换了分辨率档位"这三种情况的旧文件。
+    /// "The package was deleted""The package was replaced (sha1 changed)""The icon has changed the resolution level"这三种情况的旧文件。
     /// <para>
     /// 删除前还有两道闸：① 至少放了 <paramref name="minAgeMinutes"/> 分钟（防止删掉本轮
     /// 刚被别的扫描根/别的行写出来的文件）；② 删到 <paramref name="budget"/> 个就停（防单轮删太多卡住 UI）。

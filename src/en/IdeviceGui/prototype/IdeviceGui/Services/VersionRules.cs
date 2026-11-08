@@ -40,7 +40,7 @@ internal readonly record struct IosVersion(int Major, int Minor, int Patch) : IC
 
 /// <summary>
 /// 版本前置校验（2026-10-31 用户要求）：**入队与任务开始前**先比对 IPA 的 `MinimumOSVersion` 与设备 iOS，
-/// 不满足就直接拒绝/判失败——不要等几十 MB 传完、装到一半才在设备上报"版本太低"。
+/// 不满足就直接拒绝/判失败——不要等几十 MB 传完、装到一半才在设备上报"Version is too low"。
 /// <para>
 /// 这是 M5（完整兼容性判定：架构 / 设备族 / RequiredCapture）之前的**最小一道闸**，不替代 M5。
 /// </para>

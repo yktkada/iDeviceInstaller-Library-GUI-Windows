@@ -1,9 +1,9 @@
 namespace IdeviceGui.ViewModels.Library;
 
 /// <summary>
-/// 资料库右键"复制…"的取值逻辑（2026-11-01 用户要求）。
+/// 资料库右键"Copy…"的取值逻辑（2026-11-01 用户要求）。
 /// <para>纯函数，方便单测；组行走 <see cref="LibraryRow.GroupBundleId"/>，文件行取各自字段。
-/// 空白值统一返回 null（界面提示"没有可复制的…"，不把空串写进剪贴板）。</para>
+/// 空白值统一返回 null（界面提示"There is nothing to copy…"，不把空串写进剪贴板）。</para>
 /// </summary>
 internal static class LibraryCopy
 {

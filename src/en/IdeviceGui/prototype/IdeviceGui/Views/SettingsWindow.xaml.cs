@@ -24,7 +24,7 @@ internal partial class SettingsWindow : Window
     private bool _loading = true;   // XAML 加载期间 Slider 的 Min/Max 赋值会触发 ValueChanged，先挡住
     private bool _applied;
     private bool _closed;           // 审查 N4：窗口已关，async void 根操作不要再弹框 / 碰控件
-    private bool _dirty;            // 审查 N6：没改过就不要在关窗时"回滚一次"（会白跳一下）
+    private bool _dirty;            // 审查 N6：没改过就不要在关窗时"rollback once"（会白跳一下）
     private readonly System.Windows.Threading.DispatcherTimer _previewTimer;   // 审查 N8：文本框防抖 300 ms
 
     private readonly List<(LibrarySortField Field, string Text)> _sortOptions = new()
@@ -313,7 +313,7 @@ internal partial class SettingsWindow : Window
 
     // ── 事件 ────────────────────────────────────────────────────────────────
 
-    /// <summary>行高滑杆：先把值同步到输入框，再走统一的"改草稿"路径（输入框是唯一事实来源）。</summary>
+    /// <summary>行高滑杆：先把值同步到输入框，再走统一的"Revise the draft"路径（输入框是唯一事实来源）。</summary>
     private void OnRowHeightSliderChanged(object sender, RoutedEventArgs e)
     {
         if (_loading || _closed) return;
@@ -370,7 +370,7 @@ internal partial class SettingsWindow : Window
     private void OnResetColumnsClick(object sender, RoutedEventArgs e)
     {
         if (_closed) return;
-        // 审查 N2：立即生效的动作（不进草稿），界面上已标注"不受取消影响"
+        // 审查 N2：立即生效的动作（不进草稿），界面上已标注"not affected by cancellation"
         _owner.ResetSettingsLayoutColumns();
     }
 
@@ -483,8 +483,8 @@ internal partial class SettingsWindow : Window
             // 审查 N7：一次事务写完再返回（之前每键 fire-and-forget，关程序可能丢写）
             await _vm.FlushSettingsAsync();
 
-            // 审查 N1：应用之后**取消**不该把界面回滚到"打开窗口时"（库已是新值）；
-            // 验收基线改为当前草稿——之后取消只会撤销"应用之后又改的那部分"。
+            // 审查 N1：应用之后**取消**不该把界面回滚到"When opening a window"（库已是新值）；
+            // 验收基线改为当前草稿——之后取消只会撤销"The part that is modified after application"。
             _initial = _draft.Clone();
             _dirty = false;
         }
@@ -498,7 +498,7 @@ internal partial class SettingsWindow : Window
         _previewTimer.Stop();
 
         // 审查 N6：没改过就别回滚（否则行高/布局/列宽会白跳一下）；
-        // 审查 N1：改过且没点确定/应用 → 回滚到"最后一次持久化的基线"（初始值或上次应用的值）。
+        // 审查 N1：改过且没点确定/应用 → 回滚到"Last persisted baseline"（初始值或上次应用的值）。
         if (!_applied && _dirty)
         {
             _vm.ApplySettings(_initial, persist: false);

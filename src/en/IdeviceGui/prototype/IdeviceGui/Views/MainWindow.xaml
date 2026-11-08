@@ -447,7 +447,7 @@
                             <DataTrigger Binding="{Binding Device.Online}" Value="False">
                                 <Setter Property="Foreground" Value="#FF9A9A9A" />
                                 <Setter Property="Opacity" Value="0.55" />
-                                <Setter Property="ToolTip" Value="设备离线（插回后自动恢复）" />
+                                <Setter Property="ToolTip" Value="Device offline (automatically resumes after plugging it back in)" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -670,7 +670,7 @@
                                 FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
                                 VerticalAlignment="Center"
                                 Click="OnToggleDeviceAppsMultiSelectClick"
-                                ToolTip="Device apps multi-select: click a row to select/deselect, then batch uninstall" />
+                                ToolTip="Device app multi-selection: click row to select/cancel, then batch uninstall" />
                         <Button x:Name="DeviceAppsBatchUninstallButton"
                                 Content="{Binding DeviceAppsBatchUninstallText}"
                                 FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
@@ -680,7 +680,7 @@
                                 ToolTip="Uninstall all selected device apps" />
                         <Button Content="Select all" FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
                                 VerticalAlignment="Center" Click="OnSelectAllDeviceAppsClick" />
-                        <Button Content="Clear selection" FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
+                        <Button Content="Deselect" FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
                                 VerticalAlignment="Center" Click="OnClearDeviceAppsSelectionClick" />
                         <TextBlock Text="{Binding DeviceAppsCountText}" FontSize="11" Margin="2,0,0,2"
                                    VerticalAlignment="Center" Foreground="#FF666666" />
@@ -709,7 +709,7 @@
                         <DataGrid.ContextMenu>
                             <ContextMenu x:Name="SingleLibraryContextMenu">
                                 <MenuItem x:Name="SingleForceInstallMenu"
-                                          Header="Force install to current device (skip minimum iOS and space checks)"
+                                          Header="Force installation to current device (skips minimum iOS and space checks)"
                                           Click="OnForceInstallClick" />
                                 <Separator />
                                 <MenuItem Header="Copy BundleID" Click="OnCopyBundleId" />

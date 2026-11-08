@@ -198,12 +198,12 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Queue -->
+            <!-- 队列 -->
             <TabItem Header="Queue">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                     <StackPanel>
                         <Button Content="Restore defaults" Style="{StaticResource GroupResetButton}" Tag="Queue" Click="OnResetGroupClick" />
-                        <TextBlock Text="Queue row fields (order / visibility)" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="Queue row fields (order/display)" Style="{StaticResource SectionTitle}" />
                         <ListBox x:Name="QueueFieldsList" Height="260"
                                  AutomationProperties.AutomationId="SettingsQueueFieldsList">
                             <ListBox.ItemTemplate>
@@ -217,7 +217,7 @@
                             <Button Content="Move up" Padding="10,3" Click="OnQueueFieldUpClick" />
                             <Button Content="Move down" Padding="10,3" Margin="8,0,0,0" Click="OnQueueFieldDownClick" />
                         </StackPanel>
-                        <TextBlock Text="Status / Note / Name / Version / Installed size are shown by default. Notes appear only for Failed / Paused / Suspended; if every field is hidden, the status falls back."
+                        <TextBlock Text="&quot;Status/Remarks/Name/Version/Post-installation Size&quot; is displayed by default; remarks are only displayed when failed/paused/suspended; fall back to the status bar when all are hidden."
                                    TextWrapping="Wrap" Foreground="#FF666666" Margin="0,8,0,0" />
                     </StackPanel>
                 </ScrollViewer>

@@ -7,7 +7,7 @@ namespace IdeviceGui.Services;
 /// <para>
 /// 发布版：`data` 与 `logs` 都在 exe 同级。开发期可用环境变量 <c>IDEVICEGUI_DATA</c>
 /// 把**数据**目录指到项目内（避免 `dotnet clean` 删库，见 docs/10 §3.3）；
-/// <b>日志目录始终跟着程序目录</b>，不跟随该变量——崩溃日志要能在"刚部署到新机器"时也找到。
+/// <b>日志目录始终跟着程序目录</b>，不跟随该变量——崩溃日志要能在"Just deployed to new machine"时也找到。
 /// </para>
 /// </summary>
 internal static class AppPaths

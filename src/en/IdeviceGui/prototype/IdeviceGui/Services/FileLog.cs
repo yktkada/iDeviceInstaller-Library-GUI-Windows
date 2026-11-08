@@ -6,8 +6,8 @@ namespace IdeviceGui.Services;
 /// <summary>
 /// 文件日志（docs/08 §3.1）：<c>&lt;程序目录&gt;\logs\app.log</c>，5 MB × 3 轮转，**只写程序目录**。
 /// <para>
-/// M2 简化：逐行写入（每行 Flush），不做"后台每 1 秒批量 Flush"——B4 日志面板会统一做批量，
-/// 现在先保证"扫描 / 写库错误一定留得下来"，避免两套缓冲各写一遍。
+/// M2 简化：逐行写入（每行 Flush），不做"Batch Flush every 1 second in the background"——B4 日志面板会统一做批量，
+/// 现在先保证"Scan/write library errors must be retained"，避免两套缓冲各写一遍。
 /// </para>
 /// <para>打开失败（目录不可写 / 被杀软锁）不抛异常：记录 <see cref="OpenError"/> 并自动关闭文件日志，不影响程序。</para>
 /// </summary>

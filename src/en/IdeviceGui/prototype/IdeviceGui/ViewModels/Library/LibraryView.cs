@@ -4,7 +4,7 @@ using IdeviceGui.Services.Parsing;
 
 namespace IdeviceGui.ViewModels.Library;
 
-/// <summary>排序字段（只覆盖能被"网格列头"触发的那些）。</summary>
+/// <summary>排序字段（只覆盖能被"Grid column header"触发的那些）。</summary>
 internal enum LibrarySortField
 {
     AppSize,
@@ -36,7 +36,7 @@ internal sealed class LibraryView
 
     private bool _mergeSameBundle = true;
 
-    /// <summary>已见过（≥2 个成员）的组。首次出现即默认收起，覆盖"扫描中途新增组"的情况（复审 B6/B7）。</summary>
+    /// <summary>已见过（≥2 个成员）的组。首次出现即默认收起，覆盖"New group added during scan"的情况（复审 B6/B7）。</summary>
     private readonly HashSet<string> _knownGroups = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
@@ -119,7 +119,7 @@ internal sealed class LibraryView
         {
             if (_mergeSameBundle == value) return;
             _mergeSameBundle = value;
-            if (value) CollapseCurrentGroups();   // 重新开启合并：直接折叠当前所有组（不再依赖"下一次 Build"，复审 B7）
+            if (value) CollapseCurrentGroups();   // 重新开启合并：直接折叠当前所有组（不再依赖"Next Build"，复审 B7）
         }
     }
 
@@ -137,7 +137,7 @@ internal sealed class LibraryView
     /// <summary>当前搜索/筛选命中的文件行（未按组合并、未按展开状态裁剪）；多选「全选」口径用。</summary>
     internal IReadOnlyList<LibraryRow> FilteredFiles => _filteredSorted;
 
-    /// <summary>行数据版本（扫描/临时行变化时递增；MainViewModel 的标记签名用它判断"行数据变了"）。</summary>
+    /// <summary>行数据版本（扫描/临时行变化时递增；MainViewModel 的标记签名用它判断"The row data has changed"）。</summary>
     internal long DataVersion => _dataVersion;
 
     /// <summary>当前用户分组的成员行 Id；null / 空 = 全部。由 MainViewModel 在切换分组时下发。</summary>
@@ -160,7 +160,7 @@ internal sealed class LibraryView
 
     /// <summary>
     /// 排序快照行（2026-11-04 审查 P2-A）：在 UI 线程把参与排序的字段值**取成不可变副本**，
-    /// 后台只读快照、不碰活行对象 → 不会出现"比较器读到半新半旧值"的竞态。
+    /// 后台只读快照、不碰活行对象 → 不会出现"The comparator reads the half-old value"的竞态。
     /// </summary>
     internal readonly record struct PrefetchRow(
         long Id, long AppSize, long FileSize,
@@ -180,7 +180,7 @@ internal sealed class LibraryView
     }
 
     /// <summary>
-    /// 后台构建"每字段 × 每方向"的排序下标（纯函数，不碰 UI；可取消）。
+    /// 后台构建"per field × per direction"的排序下标（纯函数，不碰 UI；可取消）。
     /// 排序语义与 <see cref="SortFiles"/> 完全一致（同一比较器）。
     /// </summary>
     internal static Dictionary<(LibrarySortField Field, bool Descending), int[]> BuildPrefetchIndexes(
@@ -344,7 +344,7 @@ internal sealed class LibraryView
 
     public bool IsCollapsed(string bundleId) => _collapsed.Contains(bundleId);
 
-    /// <summary>把"当前已有 ≥2 个成员"的组全部折叠（开启合并 / 关→开时调用；不依赖下一次 Build）。</summary>
+    /// <summary>把"There are currently ≥2 members"的组全部折叠（开启合并 / 关→开时调用；不依赖下一次 Build）。</summary>
     private void CollapseCurrentGroups()
     {
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -364,7 +364,7 @@ internal sealed class LibraryView
     public List<LibraryRow> Build()
     {
         // 审查 B8（2026-11-03）：已知组 / 收起集合会话内只增不减，长期跑会缓慢膨胀。
-        // 超过上限就整体清空（代价只是"已知组"回到默认展开状态，不影响数据）。
+        // 超过上限就整体清空（代价只是"known group"回到默认展开状态，不影响数据）。
         const int maxKnownGroups = 5000;
         if (_knownGroups.Count > maxKnownGroups)
         {
@@ -380,7 +380,7 @@ internal sealed class LibraryView
 
     /// <summary>
     /// 第①段：排序主序列缓存 + 过滤（B2，2026-11-04）。
-    /// 全量排序只在"排序字段/方向 / 数据版本"变化时做一次；搜索只按主序列顺序过滤，不再重排。
+    /// 全量排序只在"Sort field/direction/data version"变化时做一次；搜索只按主序列顺序过滤，不再重排。
     /// </summary>
     private void FilterAndSort()
     {
@@ -633,7 +633,7 @@ internal sealed class LibraryView
     }
 
 
-    /// <summary>把组行展开 / 收起的判定也作用到"组里的文件行"（界面据此缩进）。</summary>
+    /// <summary>把组行展开 / 收起的判定也作用到"file lines in group"（界面据此缩进）。</summary>
     private GroupSnapshot BuildGroupSnapshot(string bundleId, List<LibraryRow> members)
     {
         var first = members[0];
@@ -753,7 +753,7 @@ internal sealed class LibraryView
     /// <summary>匹配方式：包含 / 前缀 / 精确。</summary>
     public SearchMatchMode MatchMode { get; set; } = SearchMatchMode.Contains;
 
-    /// <summary>是否显示"文件已删除"的行（2026-11-02 用户定：右键可隐藏/显示）。</summary>
+    /// <summary>是否显示"File deleted"的行（2026-11-02 用户定：右键可隐藏/显示）。</summary>
     public bool ShowMissingFiles { get; set; } = true;
 
         /// <summary>兼容性下拉框（2026-11-05）：关 / 可安装 / 已适配。</summary>
@@ -770,9 +770,9 @@ internal sealed class LibraryView
     /// <summary>
     /// **口径参照实现（生产已改用 <see cref="LastCounts"/>；勿删）**：等价性测试用它当参照，
     /// 改计数口径必须同时改 <c>LastCounts</c> 与本方法，否则 <c>LibraryCountsAndMarksTests</c> 会红。
-    /// 计数口径（2026-11-01 修 bug）：**按过滤后的文件数**统计，与"组是否展开"无关；
+    /// 计数口径（2026-11-01 修 bug）：**按过滤后的文件数**统计，与"Whether the group is expanded"无关；
     /// 组数 = 会成组的 BundleId 数（同 BundleId 文件 ≥2）。
-    /// 之前按可见行数统计，展开/收起 BundleId 会让"N 个包"变化。
+    /// 之前按可见行数统计，展开/收起 BundleId 会让"N packages"变化。
     /// </summary>
     public (int Files, int Groups, int Missing) CountFiltered()
     {
@@ -916,7 +916,7 @@ internal sealed class LibraryView
         return values;
     }
 
-    /// <summary>组行的版本列：最小–最大（单版本就给版本号；不可比时给"N 个版本"）。</summary>
+    /// <summary>组行的版本列：最小–最大（单版本就给版本号；不可比时给"N versions"）。</summary>
     internal static string VersionRange(IReadOnlyList<LibraryRow> members)
     {
         var versions = members
@@ -934,7 +934,7 @@ internal sealed class LibraryView
         return min == max ? min : min + "–" + max;
     }
 
-    /// <summary>组行里"所有成员都相同"的字段才显示值，否则显示"Multiple"。</summary>
+    /// <summary>组行里"all members are the same"的字段才显示值，否则显示"Multiple"。</summary>
     /// <summary>组内来源全相同才显示；混合来源不显示（用户只要三类标签，不引入“多种”）。</summary>
     private static string CommonOrigin(IEnumerable<string> values)
     {

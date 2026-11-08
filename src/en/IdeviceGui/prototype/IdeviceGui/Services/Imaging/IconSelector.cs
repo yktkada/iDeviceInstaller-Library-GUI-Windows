@@ -49,7 +49,7 @@ internal readonly record struct IconRequest(
 /// <summary>
 /// 图标落盘档位（用户 2026-10-29 拍板：**按当前缩放比例动态调节**，缓存上限可配，默认 **2048 MB**，2026-10-30 拍板）。
 /// <para>
-/// 档位不是写死 32/64/128/256，而是由"常用显示尺寸 × 常用缩放"算出来：
+/// 档位不是写死 32/64/128/256，而是由"Commonly used display sizes × Commonly used scaling"算出来：
 /// 默认显示尺寸 = {32（列表）, 256（信息区/详情）}，默认缩放 = {1.0, 1.25, 1.5, 1.75, 2.0}，
 /// 算出来向上取到 16 的倍数，得到 32 / 40 / 48 / 56 / 64 / 256 / 280 / 320 / 384 / 400 / 448 / 512 这一组。
 /// </para>
@@ -74,13 +74,13 @@ internal sealed class IconCacheOptions
 
     public const int DefaultCacheMaxMb = 2048;
 
-    /// <summary>常用的图标"逻辑像素"尺寸；UI 确定后再调整（列表行高 / 信息区大小）。</summary>
+    /// <summary>常用的图标"logical pixel"尺寸；UI 确定后再调整（列表行高 / 信息区大小）。</summary>
     public List<int> DisplaySizes { get; } = new() { 32, 256 };
 
     /// <summary>要覆盖的缩放比例；默认覆盖 Windows 常见的 100%–200%。</summary>
     public List<double> DpiScales { get; } = new() { 1.0, 1.25, 1.5, 1.75, 2.0 };
 
-    /// <summary>单个图标解码上限（防内存峰值，硬约束 #8 的"缓存有上限"）。</summary>
+    /// <summary>单个图标解码上限（防内存峰值，硬约束 #8 的"Cache is capped"）。</summary>
     public int MaxDecodePx { get; set; } = 1024;
 
     /// <summary>缓存上限（MB）。默认 2048，设置项 <see cref="CacheMaxMbKey"/> 可改。</summary>
@@ -143,7 +143,7 @@ internal sealed class IconCacheOptions
     /// 算出**实际落盘尺寸**（用户 2026-10-29 追加口径）：
     /// <list type="number">
     /// <item>先把需求像素映射到档位（<see cref="BucketFor"/>）；</item>
-    /// <item>**只有"原图边长 &gt; 该档位"时才缩小**；原图本来就不够大 → **直接用原图尺寸**，不放大、也不假装成更大的档；</item>
+    /// <item>**只有"Original image side length > this gear"时才缩小**；原图本来就不够大 → **直接用原图尺寸**，不放大、也不假装成更大的档；</item>
     /// <item><see cref="DownscaleCache"/> 关掉时一律用原图尺寸（不缩）。</item>
     /// </list>
     /// 例：原图 57 / 目标 48 → 48；原图 57 / 目标 64 → **57**（不放大）；原图 1024 / 目标 48 → 48。
@@ -154,7 +154,7 @@ internal sealed class IconCacheOptions
         if (!DownscaleCache) return sourcePx;
 
         // 目标超出档位表时（例如将来 UI 要 1024），不要把 1024 硬压回最大档 512，
-        // 否则"要多大给多小"，显示会糊；这种情况下按需求本身（仍受 MaxDecodePx 限制）。
+        // 否则"Give as much as you want"，显示会糊；这种情况下按需求本身（仍受 MaxDecodePx 限制）。
         var buckets = Buckets;
         var bucket = targetPx > buckets[^1] ? Math.Min(targetPx, MaxDecodePx) : BucketFor(targetPx);
 
@@ -168,12 +168,12 @@ internal sealed class IconCacheOptions
 /// 规则（用户 2026-10-29 提的需求：按缩放匹配最合适的分辨率，**默认**就按这个来）：
 /// <list type="number">
 /// <item>按来源优先：<see cref="IconSource.StoreArtwork"/> 优先，其次 plist 点名，最后根目录 Icon*；</item>
-/// <item>同一来源下，选**不小于目标、且最接近目标**的那张（"够用的最近一张"）。
+/// <item>同一来源下，选**不小于目标、且最接近目标**的那张（"The most recent one that is enough"）。
 /// 例：候选 128 / 256 / 512，目标 270 → 512（128、256 都小于目标，放大更糊）；目标 250 → 256（比 512 近得多）。</item>
 /// <item>所有候选都小于目标时，选最大的那张（不可避免要放大，取最接近的）；</item>
 /// <item><c>MatchDisplayScale = false</c> 时退回旧行为：每个来源里挑最大的；</item>
 /// </list>
-/// 这样既能避免"永远用 1024"带来的解码与内存开销，也能避免拿小图放大。
+/// 这样既能避免"Always use 1024"带来的解码与内存开销，也能避免拿小图放大。
 /// </para>
 /// </summary>
 internal static class IconSelector

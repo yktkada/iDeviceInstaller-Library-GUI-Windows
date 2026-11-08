@@ -5,7 +5,7 @@ using IdeviceGui.Services.Data;
 
 namespace IdeviceGui.ViewModels.Library;
 
-/// <summary>网格列描述（docs/06 §3.1）：`Key` 是**稳定标识**，不存"第几列"，加列/删列时旧配置仍能对上。</summary>
+/// <summary>网格列描述（docs/06 §3.1）：`Key` 是**稳定标识**，不存"Which column"，加列/删列时旧配置仍能对上。</summary>
 internal sealed record ColumnSpec(string Key, string Header, double DefaultWidth, double MinWidth = 60);
 
 /// <summary>一列的持久化状态：显示顺序 = 数组顺序（docs/09 §3.2 `Grid.Columns`）。</summary>
@@ -22,7 +22,7 @@ internal readonly record struct GridColumnEntry(string Key, int DisplayIndex, do
 /// 默认顺序（2026-10-31 用户拍板）：图标 · 名称 · 解压后体积· 版本 · 最低 iOS · 设备族 · BundleId · 架构 · 原始大小 · 状态（最后）。
 /// <para>
 /// **列序版本（2026-11-01）**：老版本存下来的 `Grid.Columns` 是旧顺序（`name` 开头、`icon` 第 5、`state` 第 3），
-/// 直接读会让"图标不是第一列、状态不在最后"。用 `Grid.Columns.Version` 做一次迁移：旧配置**保留宽度/可见性**，
+/// 直接读会让"The icon is not in the first column and the status is not in the last column."。用 `Grid.Columns.Version` 做一次迁移：旧配置**保留宽度/可见性**，
 /// 只把顺序重排成当前默认；迁移后写回版本号，之后用户自己拖的顺序不再被动。
 /// </para>
 /// </summary>
@@ -112,7 +112,7 @@ internal static class LibraryColumns
             var raw = SettingsStore.GetString(db, GridColumnsKey);
             if (string.IsNullOrWhiteSpace(raw)) return DefaultStates;
 
-            var states = ParseSaved(raw);   // 审查 B1：迁移要看"用户真实保存的顺序"，不能用 Parse 的"缺列补最后"
+            var states = ParseSaved(raw);   // 审查 B1：迁移要看"The order in which the user actually saves"，不能用 Parse 的"Fill in the last missing column"
             var fromVersion = ReadVersion(db);
             if (fromVersion >= LayoutVersion) return Parse(raw);   // 已是最新版本：保持原语义（缺列补最后）
 

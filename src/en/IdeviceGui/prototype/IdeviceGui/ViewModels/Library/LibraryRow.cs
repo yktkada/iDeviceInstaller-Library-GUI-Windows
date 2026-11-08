@@ -72,7 +72,7 @@ internal sealed class LibraryRow : ObservableObject, IMultiSelectRow
     public bool IsGroup { get; init; }
 
     /// <summary>
-    /// 合并组的**最后一行**（2026-11-02 用户定：组块的"下分割线"画在这里）：
+    /// 合并组的**最后一行**（2026-11-02 用户定：组块的"lower dividing line"画在这里）：
     /// 收起时 = 组行本身；展开时 = 组内最后一个成员行。
     /// </summary>
     public bool IsGroupEnd
@@ -227,8 +227,8 @@ internal sealed class LibraryRow : ObservableObject, IMultiSelectRow
         ? Name
         : (IsGroupMember ? "    └ " : "") + Name + (IsTransient ? "·not in library" : "");
 
-    // 路径必须**可更新**：扫描识别到"移动/改名"时同一个 Id 的路径会变（审核 P1-1；
-    // 原先是 init-only，UpdateFrom 写不进去 → 入队仍用旧路径，报"源文件已不存在"）
+    // 路径必须**可更新**：扫描识别到"Move/rename"时同一个 Id 的路径会变（审核 P1-1；
+    // 原先是 init-only，UpdateFrom 写不进去 → 入队仍用旧路径，报"The source file no longer exists"）
     private string _filePath = "";
     private string _fileName = "";
 
@@ -489,8 +489,8 @@ internal sealed class LibraryRow : ObservableObject, IMultiSelectRow
 
     /// <summary>
     /// 入队 / 恢复判定用的版本：**未知时给 <see langword="null"/>**（审核 P2-2）。
-    /// 若把显示占位 `—` 当成版本传下去，<c>VersionsMatch</c> 会判"不一致"→ 中断恢复走重装 →
-    /// 覆盖安装清空 App 数据（AGENTS §5.7、docs/07 §3.5 要求"版本无法取得只按 BundleId 判定"）。
+    /// 若把显示占位 `—` 当成版本传下去，<c>VersionsMatch</c> 会判"inconsistent"→ 中断恢复走重装 →
+    /// 覆盖安装清空 App 数据（AGENTS §5.7、docs/07 §3.5 要求"The version cannot be obtained and can only be determined by BundleId."）。
     /// </summary>
     public string? PackageVersionForQueue =>
         string.IsNullOrWhiteSpace(Version) && string.IsNullOrWhiteSpace(Build) ? null : VersionText;
@@ -513,7 +513,7 @@ internal sealed class LibraryRow : ObservableObject, IMultiSelectRow
     /// <summary>用一行库数据原地更新（只在值变化时发通知）。</summary>
     public void UpdateFrom(PackageRow row)
     {
-        // 路径先更新：扫描识别"移动 / 改名"时同一 Id 的 FilePath 会变（审核 P1-1）
+        // 路径先更新：扫描识别"Move/Rename"时同一 Id 的 FilePath 会变（审核 P1-1）
         FilePath = row.FilePath ?? "";
         FileName = row.FileName ?? "";
         NormalizedPath = row.NormalizedPath;
@@ -557,7 +557,7 @@ internal sealed class LibraryRow : ObservableObject, IMultiSelectRow
 
     /// <summary>
     /// 体积范围（组行用）：**同单位只写一次单位**，如 `0.91–1.92 GB`；不同单位才各带一次（`95.4 MB–1.92 GB`）。
-    /// 两端相同只给单值。这样在 92–132 DIP 的列宽里不会被裁掉开头（2026-10-31 用户反馈的"显示 9.1GB−1.92GB"就是裁字造成的）。
+    /// 两端相同只给单值。这样在 92–132 DIP 的列宽里不会被裁掉开头（2026-10-31 用户反馈的"Display 9.1GB−1.92GB"就是裁字造成的）。
     /// </summary>
     internal static string FormatBytesRange(long min, long max)
     {
@@ -575,7 +575,7 @@ internal sealed class LibraryRow : ObservableObject, IMultiSelectRow
         return low + "–" + high;
     }
 
-    /// <summary>体积的"数值 + 单位"两部分（复审 C1：范围拼接不再靠拆字符串，避免改格式时静默错位）。</summary>
+    /// <summary>体积的"value + unit"两部分（复审 C1：范围拼接不再靠拆字符串，避免改格式时静默错位）。</summary>
     internal static (string Value, string Unit) FormatBytesParts(long bytes) => bytes switch
     {
         >= 1024L * 1024 * 1024 => ((bytes / 1024.0 / 1024.0 / 1024.0).ToString("0.00"), "GB"),

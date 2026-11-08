@@ -139,7 +139,7 @@ internal readonly record struct UninstallOutcome(
     bool TimedOut)
 {
     /// <summary>
-    /// 注意：这只是"CLI 没报错"，不是最终成功判定。iOS 6/7 卸载不存在的 App 会返回 0（假成功），
+    /// 注意：这只是"CLI reported no error"，不是最终成功判定。iOS 6/7 卸载不存在的 App 会返回 0（假成功），
     /// 真正的判定要靠回读（07 §3.6、总览 §6.3）；B3 之前该缺口明确记录在进度文档里。
     /// </summary>
     public bool LooksSuccessful => !TimedOut && ExitCode == 0 && !HasErrorLine;
@@ -169,7 +169,7 @@ internal readonly record struct AfcSpaceOutcome(
 internal readonly record struct InstalledApp(string BundleId, string Version, bool VersionKnown, string DisplayName = "");
 
 /// <summary>
-/// CLI 子进程封装。所有方法异步、可取消，内部负责"无输出判卡死 + 超时杀进程树"。
+/// CLI 子进程封装。所有方法异步、可取消，内部负责"No output means stuck + timeout kills process tree"。
 /// 实现：CliRunner（Services/CliRunner 的实现方负责）。
 /// </summary>
 internal interface ICliRunner
@@ -180,7 +180,7 @@ internal interface ICliRunner
     /// <summary>ideviceinfo 探测；超时 15 s，超时视为设备无响应。</summary>
     Task<DeviceProbe> ProbeAsync(string udid, CancellationToken ct);
 
-    /// <summary>安装。超时判据是"180 s 无新输出"，不是总时长（07 §3.3）。</summary>
+    /// <summary>安装。超时判据是"180 s no new output"，不是总时长（07 §3.3）。</summary>
     Task<InstallOutcome> InstallAsync(
         string udid,
         string ipaPath,

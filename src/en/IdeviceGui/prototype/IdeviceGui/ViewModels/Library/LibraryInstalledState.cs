@@ -2,7 +2,7 @@ namespace IdeviceGui.ViewModels.Library;
 
 /// <summary>
 /// ✓ 列状态（2026-11-01）：未装 / 已装。
-/// 2026-11-02 用户定：**`◐`（部分已装）废弃**——组行"任一成员已装 → 打勾"，不再区分部分。
+/// 2026-11-02 用户定：**`◐`（部分已装）废弃**——组行"Any member has been installed → check"，不再区分部分。
 /// 2026-11-05 用户定：新增 `OtherVersion`——同 BundleId 但版本不同/未知，勾列浅蓝底、不显示勾。
 /// </summary>
 internal enum LibraryInstalledState

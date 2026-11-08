@@ -62,7 +62,7 @@ internal sealed class DeepParseResult
 /// <summary>图标解码结果（已还原成标准 PNG 字节 + 缓存键）。</summary>
 internal sealed record IconLoadResult(byte[] PngBytes, string IconKey, int Width, int Height, bool UsedFallback = false)
 {
-    /// <summary>图标内容置空（只留键），用于把"该行引用了哪些图标"传出来做引用计数。</summary>
+    /// <summary>图标内容置空（只留键），用于把"Which icons are referenced in this line?"传出来做引用计数。</summary>
     public static IconLoadResult KeyOnly(string iconKey) => new(Array.Empty<byte>(), iconKey, 0, 0);
 }
 

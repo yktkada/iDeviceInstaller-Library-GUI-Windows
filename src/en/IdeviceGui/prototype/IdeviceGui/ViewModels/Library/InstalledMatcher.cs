@@ -25,7 +25,7 @@ internal static class InstalledMatcher
         if (installed is null) return false;
         if (!NameMatches(installed.Value, name)) return false;
 
-        // 复用 QueueService 的版本判定：任一侧未知返回 null → 视为"不匹配"（无法证明同版本）
+        // 复用 QueueService 的版本判定：任一侧未知返回 null → 视为"no match"（无法证明同版本）
         return InstalledAppSet.VersionsMatch(installed.Value, packageVersion) == true;
     }
 

@@ -2,7 +2,7 @@ using System.Threading;
 
 namespace IdeviceGui.Services;
 
-/// <summary>日志行类别（b3a 口径，2026-10-31 复审 P0-1 采纳后由"关键词匹配"改为"调用点显式标注"）。</summary>
+/// <summary>日志行类别（b3a 口径，2026-10-31 复审 P0-1 采纳后由"keyword matching"改为"Explicit call site annotation"）。</summary>
 internal enum LogKind
 {
     /// <summary>过程行：进度、回读、空间检查细节等。简洁模式不显示（但照常记录）。</summary>

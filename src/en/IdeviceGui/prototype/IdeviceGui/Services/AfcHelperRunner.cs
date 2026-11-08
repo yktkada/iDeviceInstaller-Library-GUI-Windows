@@ -145,7 +145,7 @@ internal sealed class AfcHelperRunner : IAfcHelper
     private async Task<HelperRun> RunAsync(string command, string udid, IProgress<string>? log, CancellationToken ct)
     {
         // 复用 ProcessRunner（体检报告 P0-4）：进程登记进它的活动表 → 关窗 KillAll 能兜底杀到；
-        // 超时 / 取消统一按"杀进程树 + 有限宽限等退出 + 硬上限"收尾，不再自己管流与看门狗。
+        // 超时 / 取消统一按"Kill process tree + limited grace etc. to exit + hard cap"收尾，不再自己管流与看门狗。
         var result = await ProcessRunner.RunAsync(new ProcessRunOptions
         {
             FileName = _helperPath,

@@ -137,7 +137,7 @@ internal sealed class DeviceQueueViewModel : ObservableObject
     public bool IsBusy => _runState == QueueRunState.Running;
 
     /// <summary>
-    /// 该设备已安装 App 的集合快照（B3 回读结果）。M4 的"已安装"列与卸载入口读它；
+    /// 该设备已安装 App 的集合快照（B3 回读结果）。M4 的"Installed"列与卸载入口读它；
     /// 为 null 表示还没回读过。
     /// </summary>
     public IReadOnlyList<InstalledApp>? InstalledApps
@@ -261,12 +261,12 @@ internal sealed class DeviceQueueViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 清空"已结束"的任务（2026-11-01 用户定；2026-11-02 起由「刷新」复用，`⟳` = 清已结束 + 清标记）：
+    /// 清空"ended"的任务（2026-11-01 用户定；2026-11-02 起由「刷新」复用，`⟳` = 清已结束 + 清标记）：
     /// 只保留**排队中（Pending）**与**运行中**（校验/预检/清理/空间/安装/卸载/回读），
     /// 以及可恢复的 Paused / NeedsConfirm；其余（Done / Failed / Cancelled）全部移除。
     /// 返回被移除的条数（日志/状态栏用，避免调用方再算一遍）。
     /// </summary>
-    /// <summary>该状态是否属于"已结束"（可被「刷新」移出队列）；判定复用服务端的 <see cref="QueueStatusKinds.IsFinished"/>。</summary>
+    /// <summary>该状态是否属于"ended"（可被「刷新」移出队列）；判定复用服务端的 <see cref="QueueStatusKinds.IsFinished"/>。</summary>
     internal static bool IsFinishedStatus(QueueStatus status) => status.IsFinished();
 
     public int ClearFinished()
@@ -303,7 +303,7 @@ internal sealed class DeviceQueueViewModel : ObservableObject
         job.Percent = e.Percent;
         CurrentPercent = e.Percent;
         // 2026-11-03 用户报 bug：传输阶段页签条不涨（传输是 `Transfer: x%` 事件，之前这里不重算，
-        // 只有状态变化/安装段事件才重算 → 页签停在 1% 细边，看着像"原始色"，到安装段才出现）。
+        // 只有状态变化/安装段事件才重算 → 页签停在 1% 细边，看着像"original color"，到安装段才出现）。
         RecomputeProgress();
     }
 
@@ -389,7 +389,7 @@ internal sealed class DeviceQueueViewModel : ObservableObject
     public int ProgressFailed { get; private set; }
     public int ProgressUnfinished { get; private set; }
 
-    /// <summary>已完成 / 分母（0..1）；终态与"无任务"时不用于画条。</summary>
+    /// <summary>已完成 / 分母（0..1）；终态与"No tasks"时不用于画条。</summary>
     public double ProgressFraction => _progressFraction;
 
     /// <summary>画条用的宽度分数：**终态一律满格**（全绿/全红），进行中按已完成比例。</summary>
@@ -451,7 +451,7 @@ internal sealed class DeviceQueueViewModel : ObservableObject
                 : (failed > 0 ? QueueProgressVisual.AllFailed : QueueProgressVisual.AllDone);
 
         var fraction = total == 0 ? 0d : progressSum / total;
-        // 有任务在跑就至少留一条细边（刚开始还没回百分比的那一瞬间也不至于"完全没有条"）
+        // 有任务在跑就至少留一条细边（刚开始还没回百分比的那一瞬间也不至于"No rules at all"）
         if (unfinished > 0 && fraction < MinProgressFraction) fraction = MinProgressFraction;
         _progressFraction = Math.Clamp(fraction, 0d, 1d);
         _progressSuppressed = false;   // 队列一有变化就重新按规则显示
@@ -524,7 +524,7 @@ internal sealed class DeviceQueueViewModel : ObservableObject
     private static double JobProgressFraction(JobViewModel job)
     {
         // 注意：**传输也在 `Installing` 状态里跑**（状态在调 CLI 前就置 Installing），所以不能用状态判段，
-        // 只能用"是否已经收到过 `Install: … (NN%)`"（`InstallPercent > 0`）来判"安装段已开始"。
+        // 只能用"Have you received `Install: … (NN%)`"（`InstallPercent > 0`）来判"Installation segment has started"。
         if (job.InstallStarted)
             return TransferWeight + (1d - TransferWeight) * Math.Clamp(job.InstallPercent, 0d, 100d) / 100d;
 

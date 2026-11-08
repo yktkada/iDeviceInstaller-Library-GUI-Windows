@@ -9,13 +9,13 @@ namespace IdeviceGui;
 /// <summary>
 /// ideviceinstaller / idevice_id / ideviceinfo 的异步封装（实现 ICliRunner）。
 /// <para>
-/// 所有子进程都走 <see cref="ProcessRunner"/>：按"无输出"判卡死 + 超时 / 取消杀进程树（07 §3.3）。
+/// 所有子进程都走 <see cref="ProcessRunner"/>：按"No output"判卡死 + 超时 / 取消杀进程树（07 §3.3）。
 /// 本类没有 UI 亲和性：方法全 async、不阻塞调用线程；日志与进度只通过 IProgress 上报，
 /// UI 线程由调用方（QueueService / ViewModel）用 Task.Run / await 保证不阻塞（硬约束 #2）。
 /// </para>
 /// <para>
 /// 取消语义：ProcessRunner 杀完进程树返回 Canceled，本类再按 .NET 惯例抛
-/// <see cref="OperationCanceledException"/>——QueueService 靠它区分"用户暂停 / 关窗"与"安装失败"。
+/// <see cref="OperationCanceledException"/>——QueueService 靠它区分"User pauses/closes window"与"Installation failed"。
 /// 超时语义：一律返回 TimedOut 结果（InstallOutcome / UninstallOutcome / DeviceProbe.Missing /
 /// DiskUsage.Unknown），不抛异常。
 /// </para>
@@ -147,7 +147,7 @@ internal sealed class CliRunner : ICliRunner
                 Arguments = new[] { "-u", udid, "install", ipaPath },
                 WorkingDirectory = ToolkitDir,
 
-                // 只按"无新输出"判卡死，不设总时长（07 §3.3）
+                // 只按"No new output"判卡死，不设总时长（07 §3.3）
                 IdleTimeout = OperationIdleTimeout,
 
                 OnStdOutLine = line =>

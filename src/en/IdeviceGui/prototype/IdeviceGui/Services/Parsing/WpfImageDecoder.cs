@@ -7,7 +7,7 @@ namespace IdeviceGui.Services.Parsing;
 /// <summary>
 /// JPEG 图标的兜底解码（部分 <c>iTunesArtwork</c> 是 JPEG，自写 PngCodec 不解 JPEG）。
 /// 用 WPF/WIC 解码后统一转成 RGBA 交给 <see cref="PngCodec"/> 缩放与重编码。
-/// <para>失败返回 null（调用方按"用默认图标"处理，不影响 ParseState）。</para>
+/// <para>失败返回 null（调用方按"Use default icon"处理，不影响 ParseState）。</para>
 /// </summary>
 internal static class WpfImageDecoder
 {

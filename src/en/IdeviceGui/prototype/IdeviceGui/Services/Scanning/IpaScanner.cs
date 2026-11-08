@@ -64,7 +64,7 @@ internal sealed class IpaScanner
     private int _saveAborted;                                  // 1 = 本轮剩余批次不再尝试
     private int _saveAbortedBatches;
 
-    /// <summary>写探测自带的等锁上限（不用 15 s 的主超时，库被占住时要尽快报"不可写"）。</summary>
+    /// <summary>写探测自带的等锁上限（不用 15 s 的主超时，库被占住时要尽快报"Not writable"）。</summary>
     private const int ProbeBusyTimeoutMs = 2000;
 
     // M3 图标解码统计（第 2 条风险：WIC 在后台线程上的稳定性要靠真实数据判断，先把数据采出来）
@@ -96,7 +96,7 @@ internal sealed class IpaScanner
 
     /// <param name="forceReparse">
     /// **按次**的全量重扫开关（2026-10-31 从共享可变属性改成参数，见 `进度 §5.2` 第 3 条）：
-    /// 解析阶段连 `Ok` 行也重解析。放在参数上就不会出现"上一次调用留下的状态影响下一次"。
+    /// 解析阶段连 `Ok` 行也重解析。放在参数上就不会出现"The state left by the previous call affects the next time"。
     /// </param>
     public async Task<ScanResult> ScanAsync(
         long scanRootId,
@@ -158,7 +158,7 @@ internal sealed class IpaScanner
 
         var parseSw = Stopwatch.StartNew();
         // 除了新行（Pending），每次扫描也重试失败行：不再靠内容哈希判断变化，
-        // 而是"目录里在就重新解析一遍"，失败的行下次扫描自动再试（用户 2026-10-30 拍板）。
+        // 而是"Now in the directory, parse it again."，失败的行下次扫描自动再试（用户 2026-10-30 拍板）。
         // **全量重扫**（2026-10-31 用户要的按钮）：连 Ok 行也重解析——
         // 用来补旧版本入库、深字段（体积 / 图标 / 架构）为空的行；ParseVersion 照常 +1。
         // 口径来自本次调用参数（不是共享可变属性，见 进度 §5.2 第 3 条）。
@@ -184,7 +184,7 @@ internal sealed class IpaScanner
         return result;
     }
 
-    /// <summary>供调用方在"准备阶段"先问一句"库能不能写"（2 s 内给结论，不拖住启动）。</summary>
+    /// <summary>供调用方在"preparation stage"先问一句"Can the library be written?"（2 s 内给结论，不拖住启动）。</summary>
     internal string? ProbeDatabase() => TryWriteProbe();
 
     /// <summary>写探测：能写返回 null，不能写返回原因。只动 Settings 一个 key 并回滚。</summary>
@@ -197,7 +197,7 @@ internal sealed class IpaScanner
             _db.Write(conn =>
             {
                 // 真 IMMEDIATE（deferred:false）：探测要当场抢写锁。默认的 deferred 事务要到
-                // INSERT 才抢，与 docs/03 §3.4 的"BEGIN IMMEDIATE"及"几毫秒"口径不符。
+                // INSERT 才抢，与 docs/03 §3.4 的"BEGIN IMMEDIATE"及"milliseconds"口径不符。
                 using var tx = conn.BeginTransaction(System.Data.IsolationLevel.Serializable, deferred: false);
                 using var cmd = conn.CreateCommand();
                 cmd.Transaction = tx;
@@ -305,7 +305,7 @@ internal sealed class IpaScanner
                     row.ExistsFlag = false;
                     toSave.Add(row);
                     result.IdentityFlips++;
-                    unmatchedRows.Add(row);   // 文件留给"新增"分支
+                    unmatchedRows.Add(row);   // 文件留给"New"分支
                     continue;
                 }
 
@@ -368,7 +368,7 @@ internal sealed class IpaScanner
             toSave.Add(row);
         }
 
-        // ④（已删除）原方案 A 的"同大小桶内比 SHA1"恢复映射：内容哈希已砍，不再有恢复匹配。
+        // ④（已删除）原方案 A 的"SHA1 ratio within the same size bucket"恢复映射：内容哈希已砍，不再有恢复匹配。
         //    同路径回来的文件仍在 ② 里按路径复用同一行（大小/mtime 变了就重解析），不会每次删/放都新增两行。
 
         // ⑤ 仍未匹配的行 → ExistsFlag = 0（保留行，队列可能引用）
@@ -479,7 +479,7 @@ internal sealed class IpaScanner
     private void ParsePending(List<PackageRow> pending, IProgress<ScanProgress>? progress,
         CancellationToken ct, ScanResult result)
     {
-        // 统计按"本轮"清零：否则手动刷新多轮后日志里的"新写/已缓存"是进程累计值（P2-1）。
+        // 统计按"This round"清零：否则手动刷新多轮后日志里的"Newly written/cached"是进程累计值（P2-1）。
         _iconNewFiles = 0;
         _iconCacheHits = 0;
         _iconFallback = 0;
@@ -492,7 +492,7 @@ internal sealed class IpaScanner
         var done = 0;
 
         // 解析线程**只入队**；写库与回调都在这个提交者线程上做。
-        // 原因（2026-10-30 实测）：在 Parallel.ForEach 的工作线程里直接写库会出现"第一批之后就停住"。
+        // 原因（2026-10-30 实测）：在 Parallel.ForEach 的工作线程里直接写库会出现"Stop after the first batch"。
         using var queue = new BlockingCollection<List<PackageRow>>(new ConcurrentQueue<List<PackageRow>>());
         var committer = Task.Factory.StartNew(() =>
         {
@@ -626,11 +626,11 @@ internal sealed class IpaScanner
             catch (InvalidOperationException) { /* 已完成（取消路径），忽略 */ }
         }
 
-        // 扫描结束：先按"引用计数"清掉没人引用的旧图标（包被删 / 被替换 / 换了档位），
+        // 扫描结束：先按"Reference counting"清掉没人引用的旧图标（包被删 / 被替换 / 换了档位），
         // 再按上限做 LRU 兜底（容量保护）。只删缓存目录里的 png。
         if (_dataDirectory is not null && _iconOptions is not null)
         {
-            // 只把"仍存在"的行算作引用：已删包（ExistsFlag=0）的 IconKey 不该继续保住 png，
+            // 只把"still exists"的行算作引用：已删包（ExistsFlag=0）的 IconKey 不该继续保住 png，
             // 否则删包后图标永不回收（审核报告 P1-3 实测）。
             var referenced = new HashSet<string>(
                 PackageStore.LoadAll(_db)
@@ -672,7 +672,7 @@ internal sealed class IpaScanner
             }
         }
 
-        // 图标解码统计（每次都打，便于 L2/L3 用同一口径对比；0 值也打，避免"没这行=没跑"的歧义）
+        // 图标解码统计（每次都打，便于 L2/L3 用同一口径对比；0 值也打，避免"No such thing = no running"的歧义）
         var iconFailures = _iconErrors.Values.Sum();
         var errorText = _iconErrors.Count == 0
             ? "None"
@@ -688,8 +688,8 @@ internal sealed class IpaScanner
 
     /// <summary>
     /// 落库一批并投递给调用方（M4-a，在提交者线程上调用）。
-    /// 失败按"3 次尝试 / 间隔 800 ms"重试（用户 2026-10-30 拍板，给外部持锁留窗口）；
-    /// 重试只针对"等一等可能就好"的错误，并且可取消、有总预算（审核 P2-1 / P2-2）。
+    /// 失败按"3 attempts / 800 ms interval"重试（用户 2026-10-30 拍板，给外部持锁留窗口）；
+    /// 重试只针对"Maybe just wait a moment"的错误，并且可取消、有总预算（审核 P2-1 / P2-2）。
     /// </summary>
     private void SaveAndPublish(List<PackageRow> rows, CancellationToken ct)
     {
@@ -729,7 +729,7 @@ internal sealed class IpaScanner
         }
         catch (Exception ex)
         {
-            // 回调（上屏）失败不影响落库结果，单独记，不再误报成"落库失败"（P3）。
+            // 回调（上屏）失败不影响落库结果，单独记，不再误报成"Failed to drop into warehouse"（P3）。
             _log?.Invoke($"Parse batch display callback failed ({rows.Count} rows): {ex.GetType().Name}: {ex.Message}");
         }
     }
@@ -788,11 +788,11 @@ internal sealed class IpaScanner
         return new SaveAttempt(SaveAttemptStatus.Failed, attemptsMade, last);
     }
 
-    /// <summary>这类错误"等一等可能就好"（库被备份/杀软短暂占住、磁盘抖动）；其余一律不重试。</summary>
+    /// <summary>这类错误"Maybe just wait a moment"（库被备份/杀软短暂占住、磁盘抖动）；其余一律不重试。</summary>
     private static bool IsRetryableSaveError(Exception ex) =>
         ex is Microsoft.Data.Sqlite.SqliteException or IOException;
 
-    /// <summary>把一行清成"没解析过"（失败行不留半截元数据，避免列表显示错字段）。</summary>
+    /// <summary>把一行清成"Not parsed"（失败行不留半截元数据，避免列表显示错字段）。</summary>
     private static void ClearParseFields(PackageRow row)
     {
         row.BundleId = null;

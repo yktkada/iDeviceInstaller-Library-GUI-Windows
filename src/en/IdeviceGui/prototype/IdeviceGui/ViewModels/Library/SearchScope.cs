@@ -19,7 +19,7 @@ internal enum SearchField
     FileSize,
 }
 
-/// <summary>匹配方式（2026-11-01 用户定：要给"精确匹配 / 前缀"这类开关）。</summary>
+/// <summary>匹配方式（2026-11-01 用户定：要给"exact match/prefix"这类开关）。</summary>
 internal enum SearchMatchMode
 {
     Contains,

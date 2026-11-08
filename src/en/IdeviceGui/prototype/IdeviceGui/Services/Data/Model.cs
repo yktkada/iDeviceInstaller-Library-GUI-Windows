@@ -2,7 +2,7 @@ namespace IdeviceGui.Services.Data;
 
 /// <summary>
 /// 身份种类。<b>同一行只填一套身份</b>：<see cref="FileId"/> 行只写三列文件 ID，
-/// <see cref="PathFallback"/> 行只写 <see cref="PackageRow.NormalizedPath"/>；翻转身份按"删除 + 新增"
+/// <see cref="PathFallback"/> 行只写 <see cref="PackageRow.NormalizedPath"/>；翻转身份按"Delete + Add"
 /// （docs/09 §3.1「身份切换规则」，2026-10-29 用户拍板）。
 /// </summary>
 internal enum IdentityKind

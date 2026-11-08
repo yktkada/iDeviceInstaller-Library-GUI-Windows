@@ -29,7 +29,7 @@ internal static class DeviceInfoFields
     /// <summary>默认配置（用户 2026-11-01 定稿）。</summary>
     public static IReadOnlyList<DeviceInfoFieldSetting> Default { get; } = BuildDefault();
 
-    /// <summary>按配置取"要显示的字段，按 order 升序"。</summary>
+    /// <summary>按配置取"Fields to display, in ascending order"。</summary>
     public static IReadOnlyList<DeviceInfoField> OrderedVisible(IReadOnlyList<DeviceInfoFieldSetting> settings) =>
         settings.Where(s => s.Visible)
                 .OrderBy(s => s.Order)

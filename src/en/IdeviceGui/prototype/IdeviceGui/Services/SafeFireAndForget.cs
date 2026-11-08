@@ -6,7 +6,7 @@ namespace IdeviceGui.Services;
 /// 代码里所有 `_ = XxxAsync()` / `async void` 事件都必须走这里，理由：
 /// ① **异常不许静默消失**——原来 `_ = XxxAsync()` 现场没有任何标记，异常只会进 TaskScheduler.UnobservedTaskException（进程退出才可能触发）；
 /// ② 失败要进**状态栏红字 + 日志**（用户 2026-10-30 拍板：异常两处可见）；
-/// ③ 操作名写在这里，靠读代码就能知道"谁在后台跑"。
+/// ③ 操作名写在这里，靠读代码就能知道"Who is running in the background"。
 /// </para>
 /// <para>
 /// WPF 事件处理器的 `async void` 用 <see cref="RunHandler"/> 包一层，把 async void 缩到只剩一个入口；
@@ -38,7 +38,7 @@ internal static class SafeFireAndForget
     internal static void RunHandler(Func<Task> work, string operation, Action<string, Exception>? onError = null)
         => _ = Run(work, operation, onError);
 
-    /// <summary>把异常写成"操作名失败：类型: 消息"进日志 + 状态栏（可直接用于已有 try/catch 的事件）。</summary>
+    /// <summary>把异常写成"Operation name failed: type: message"进日志 + 状态栏（可直接用于已有 try/catch 的事件）。</summary>
     internal static void Report(string operation, Exception exception)
     {
         ArgumentNullException.ThrowIfNull(operation);

@@ -3,7 +3,7 @@ using System.IO;
 namespace IdeviceGui.Services;
 
 /// <summary>
-/// 启动参数（M3 临时用途，M4 会正式做"多扫描根"UI）。
+/// 启动参数（M3 临时用途，M4 会正式做"Multiple root scans"UI）。
 /// <para>
 /// 目前只支持一个参数：<c>--root &lt;目录&gt;</c>（也接受 <c>--root=&lt;目录&gt;</c>）。
 /// 不给就用程序目录下的 library。未知参数一律忽略——

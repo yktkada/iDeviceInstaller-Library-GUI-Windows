@@ -21,7 +21,7 @@ internal sealed class AppDatabase : IDisposable
     private bool _disposed;
 
     /// <summary>
-    /// 扫描互斥：同一库同时只允许一轮扫描。两条并发扫描各自"读一遍现有行再写"，会互相看不见对方
+    /// 扫描互斥：同一库同时只允许一轮扫描。两条并发扫描各自"Read the existing line and then write it"，会互相看不见对方
     /// 刚插入的行，从而撞 `UX_Packages_FileId` 唯一索引（B7 补充验证实测出来后才加的）。
     /// GUI 目前只在启动时扫一次，但手动重扫（M4）双击就会触发。
     /// </summary>
@@ -95,7 +95,7 @@ internal sealed class AppDatabase : IDisposable
 
     /// <summary>
     /// 写操作，自定义等锁上限（<paramref name="waitMs"/>）；<paramref name="busyTimeoutMs"/> &gt; 0 时
-    /// 临时把 SQLite 的 `busy_timeout` 调小（用完恢复）——扫描前的写探测、设备快照这类"写不进去就算了"
+    /// 临时把 SQLite 的 `busy_timeout` 调小（用完恢复）——扫描前的写探测、设备快照这类"Just forget it if you can't write it in"
     /// 的动作不该等满 15 s（审核 P2-3）。
     /// </summary>
     public T Write<T>(Func<SqliteConnection, T> work, int waitMs, int busyTimeoutMs = 0)
@@ -109,7 +109,7 @@ internal sealed class AppDatabase : IDisposable
 
             // 注意（2026-10-30 实测）：**只改 `PRAGMA busy_timeout` 不够**——Microsoft.Data.Sqlite
             // 会按 `DefaultTimeout`（默认 30 s）自己重试 BUSY，命令实际能等 30 s。
-            // 想要"很快就放弃"必须同时把连接的 DefaultTimeout 调小（秒级，最小 1 s）。
+            // 想要"give up soon"必须同时把连接的 DefaultTimeout 调小（秒级，最小 1 s）。
             var previousDefaultTimeout = _writer.DefaultTimeout;
             _writer.DefaultTimeout = Math.Max(1, (busyTimeoutMs + 999) / 1000);
             SetBusyTimeout(_writer, busyTimeoutMs);

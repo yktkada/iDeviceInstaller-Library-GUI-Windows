@@ -24,7 +24,7 @@ public partial class App : Application
         RegisterGlobalExceptionHandlers();
 
         // ⓪.5 审查 B4（2026-11-03 修）：**先看有没有实例在跑，再决定要不要提权**。
-        //     旧顺序是"先 UAC 再查单实例"——第二次双击会先弹一次 UAC，然后才提示"已有实例"。
+        //     旧顺序是"UAC first and then check the instance"——第二次双击会先弹一次 UAC，然后才提示"Already have an instance"。
         //     带 `--elevated` 的是提权后的子进程：父进程这时还没建 Mutex，跳过这个探测直接去抢。
         if (!HasElevatedMarker(e.Args) && IsAnotherInstanceRunning())
         {
@@ -38,7 +38,7 @@ public partial class App : Application
 
         // ⓪ 启动时请求管理员权限（2026-11-02 用户定）：
         //    本机在**非管理员**令牌下调用 explorer/shell（「打开文件路径」）会被系统拒绝
-        //    （explorer.exe 0xC0000142 / "Windows 无法访问指定设备、路径或文件"，踩坑 C32/C33）；
+        //    （explorer.exe 0xC0000142 / "Windows cannot access the specified device, path, or file"，踩坑 C32/C33）；
         //    用户实测**右键管理员运行正常** → 启动时主动请求 UAC。
         //    用户拒绝 UAC（Win32Exception 1223）→ **回退普通权限继续运行**（打开路径可能失败，状态栏提示）。
         //    `IDEVICEGUI_SKIP_ELEVATION=1` 供自动化测试跳过（避免弹 UAC 卡住）；`--elevated` 防重复提权。
@@ -78,7 +78,7 @@ public partial class App : Application
 
         // ③ 自检通过才建主窗口（App.xaml 已去掉 StartupUri）。
         //    **绝不能靠全局异常兜底处理启动失败**：窗口构造失败后如果只是 throw 让
-        //    DispatcherUnhandledException 吞掉，进程会变成"无窗口的 Dispatcher"一直活着，
+        //    DispatcherUnhandledException 吞掉，进程会变成"Windowless Dispatcher"一直活着，
         //    还占着单实例 Mutex，把后续正常启动全挡在门外（复核 D0，高危）。
         //    所以这里自己 try/catch → 提示 → 显式 Shutdown(1)，让 OnExit 释放 Mutex。
         ICliRunner cli;
@@ -121,7 +121,7 @@ public partial class App : Application
 
     /// <summary>
     /// 只探测、不持有：会话内是否已有实例（审查 B4：单实例检查要放在 UAC 提权之前）。
-    /// 打不开（存在但无权限）也按"有"处理——宁可少开一个窗口，也不冒双击写坏库的风险。
+    /// 打不开（存在但无权限）也按"Yes"处理——宁可少开一个窗口，也不冒双击写坏库的风险。
     /// </summary>
     private static bool IsAnotherInstanceRunning()
     {
@@ -317,7 +317,7 @@ public partial class App : Application
 
     /// <summary>
     /// 全局未处理异常（UI 线程 / 非 UI 线程）向上报的事件：主窗口据此在状态栏打红字 + 写日志。
-    /// 用户 2026-10-30 拍板：异常必须"状态红字 + 日志"两处可见，不能只写 crash.log。
+    /// 用户 2026-10-30 拍板：异常必须"Status red text + log"两处可见，不能只写 crash.log。
     /// </summary>
     public static event Action<string>? UnhandledErrorReported;
 

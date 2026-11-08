@@ -34,7 +34,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// CLI / AFC helper 由 <see cref="App.OnStartup"/> 先构造好再传进来：
-    /// 启动失败的处理必须在"建窗口之前"完成，不能靠构造函数 throw + 全局异常兜底
+    /// 启动失败的处理必须在"Before building the window"完成，不能靠构造函数 throw + 全局异常兜底
     /// （否则会留下无窗口的 Dispatcher 进程并占住单实例 Mutex，见复核 D0）。
     /// </summary>
     internal MainWindow(ICliRunner cli, IAfcHelper afc, string? scanRootOverride = null)
@@ -55,7 +55,7 @@ public partial class MainWindow : Window
                         _vm.ActiveGroupName);
             }));
 
-        // 行高可能被设置窗口"预览"改动（不经 SetLibraryRowHeight），这里统一跟一下图标列宽
+        // 行高可能被设置窗口"Preview"改动（不经 SetLibraryRowHeight），这里统一跟一下图标列宽
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.LibraryRowHeight)) ApplyIconColumnWidth();
@@ -231,7 +231,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 按保存的配置（顺序 / 宽度）建列。列**由描述表生成**而不是写死在 XAML：
-    /// 用户拖动换序后只需按 `Grid.Columns` 的顺序重建，key 稳定不认"第几列"。
+    /// 用户拖动换序后只需按 `Grid.Columns` 的顺序重建，key 稳定不认"Which column"。
     /// </summary>
     private void ApplyLibraryColumns()
     {
@@ -387,7 +387,7 @@ public partial class MainWindow : Window
 
     /// <summary>右键先选中鼠标下的行（WPF 默认右键不改选中，直接复制会复制上一行）。</summary>
     /// <summary>
-    /// 右键时命中的行（2026-11-01）：右键菜单里的复制/打开都优先用它，避免 SelectedItem 滞后导致"打开路径坏"。
+    /// 右键时命中的行（2026-11-01）：右键菜单里的复制/打开都优先用它，避免 SelectedItem 滞后导致"Bad open path"。
     /// 审查 N6：右键空白处必须清空，否则菜单会作用到上一次右键的旧行。
     /// </summary>
     private LibraryRow? _contextRow;
@@ -596,7 +596,7 @@ public partial class MainWindow : Window
     // ── 设备「更多 ▾」菜单（M4-b4：单列「值 + 点击复制」，复制不提示） ─────────────────────
 
     /// <summary>
-    /// 设备页签点击 → 通知 ViewModel 起"停留 800 ms 隐藏终态进度"的计时（2026-11-02 用户定）。
+    /// 设备页签点击 → 通知 ViewModel 起"Stay for 800 ms to hide final state progress"的计时（2026-11-02 用户定）。
     /// 点已选中的页签不会改 SelectedItem，所以必须在这里直接通知。
     /// </summary>
     private void OnDeviceTabClicked(object sender, MouseButtonEventArgs e)
@@ -1213,7 +1213,7 @@ public partial class MainWindow : Window
     private ContextMenu BuildDeviceAppsContextMenu(DeviceAppRow row)
     {
         var menu = new ContextMenu();
-        var single = new MenuItem { Header = "卸载此应用" };
+        var single = new MenuItem { Header = "Uninstall this app" };
         single.Click += (_, _) => _vm?.UninstallDeviceApp(row);
         menu.Items.Add(single);
 
@@ -1236,7 +1236,7 @@ public partial class MainWindow : Window
                 RefreshDeviceAppsSelectionBindings();
             };
             menu.Items.Add(all);
-            var clear = new MenuItem { Header = "Clear selection" };
+            var clear = new MenuItem { Header = "Deselect" };
             clear.Click += (_, _) =>
             {
                 _vm?.ClearDeviceAppsSelection();
@@ -1515,8 +1515,8 @@ public partial class MainWindow : Window
     private long _uiWatchLast;
 
     /// <summary>
-    /// 每 50 ms 打一次点；两次打点间隔 &gt; 300 ms 就记一行——用来判断"卡住"是发生在 UI 线程内，
-    /// 还是 UIA 客户端在等（M4-b2 排查"首次滚动每步 1–2 s"用；默认关闭）。
+    /// 每 50 ms 打一次点；两次打点间隔 &gt; 300 ms 就记一行——用来判断"stuck"是发生在 UI 线程内，
+    /// 还是 UIA 客户端在等（M4-b2 排查"First roll 1–2 s per step"用；默认关闭）。
     /// </summary>
     private void StartUiWatchdog()
     {

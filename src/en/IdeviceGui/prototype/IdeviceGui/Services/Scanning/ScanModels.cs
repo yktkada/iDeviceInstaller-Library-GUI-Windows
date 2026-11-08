@@ -12,7 +12,7 @@ internal sealed class ScanOptions
 
     /// <summary>
     /// 全量重扫（2026-10-31 用户要的按钮）：解析阶段**连 `Ok` 行也重新解析**，
-    /// 用来补"旧版本入库、深字段（体积 / 图标 / 架构）为空"的行。默认 false = 只解析 Pending / Failed。
+    /// 用来补"The old version is stored in the database and the deep fields (volume/icon/schema) are empty."的行。默认 false = 只解析 Pending / Failed。
     /// </summary>
     public bool ForceReparse { get; set; }
 
@@ -57,7 +57,7 @@ internal sealed class ScanResult
     /// <summary>落库失败批次数（失败批次整批回滚、行留 Pending，下次扫描会重试）。</summary>
     public int SaveFailed { get; set; }
 
-    /// <summary>因为"落库连续失败"而放弃尝试的批次数（库长期不可写时提前收手，审核 P2-2）。</summary>
+    /// <summary>因为"Continuous failure to drop into the library"而放弃尝试的批次数（库长期不可写时提前收手，审核 P2-2）。</summary>
     public int SaveAborted { get; set; }
     public int ParseOk { get; set; }
     public int ParseFailed { get; set; }
@@ -76,8 +76,8 @@ internal sealed class ScanResult
         Missing > 0 || IdentityFlips > 0 || ParseOk > 0 || ParseFailed > 0;
 
     /// <summary>
-    /// 一行摘要。**扫描被跳过时（<see cref="Error"/> 非空）必须以"扫描跳过"开头**：
-    /// 否则库里不可写会显示成"扫描完成：文件 0"（审核 P1-1）。
+    /// 一行摘要。**扫描被跳过时（<see cref="Error"/> 非空）必须以"scan skip"开头**：
+    /// 否则库里不可写会显示成"Scan completed: File 0"（审核 P1-1）。
     /// </summary>
     public string Summary => Error is { Length: > 0 }
         ? "Skipping scan: " + Error
