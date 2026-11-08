@@ -24,7 +24,7 @@ internal static class AppPaths
     public static string CrashLogPath => Path.Combine(LogsDirectory, "crash.log");
 
     /// <summary>
-    /// 数据Folder: 开发期读 <c>IDEVICEGUI_DATA</c>，否则 <c>&lt;程序目录&gt;\data</c>。
+    /// 数据目录：开发期读 <c>IDEVICEGUI_DATA</c>，否则 <c>&lt;程序目录&gt;\data</c>。
     /// <b>不回退用户目录</b>（硬约束 #7）。
     /// </summary>
     public static string DataDirectory
@@ -39,7 +39,7 @@ internal static class AppPaths
     }
 
     /// <summary>
-    /// SQLite 的临时文件Folder: <c>&lt;data&gt;\tmp</c>。
+    /// SQLite 的临时文件目录：<c>&lt;data&gt;\tmp</c>。
     /// <para>
     /// **不能留给系统 TEMP**（那是用户目录，违反硬约束 #7）：SQLite 在大事务 / 大结果集时会建临时文件，
     /// 默认落在 <c>%TEMP%</c>；实测 10 000 行扫描时在严格沙箱下直接抛

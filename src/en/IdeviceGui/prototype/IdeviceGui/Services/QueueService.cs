@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.IO;
 
 namespace IdeviceGui.Services;
@@ -62,6 +62,16 @@ internal sealed class QueueItem
     /// 不满足直接判失败、不进入上传（2026-10-31 用户要求：不能等传完才报"版本太低"）。null = 未知，不拦。
     /// </summary>
     public string? PackageMinOs { get; set; }
+
+    /// <summary>入队时的资料库 App 显示名（不是文件名）；卸载任务尽量带设备应用名。</summary>
+    public string? PackageDisplayName { get; set; }
+
+    /// <summary>入队时的 IPA 来源/设备族显示文案；卸载任务为 null。</summary>
+    public string? PackageOriginText { get; set; }
+    public string? PackageDeviceFamilyText { get; set; }
+
+    /// <summary>用户明确要求强制安装：跳过最低 iOS 与空间检查（2026-11-08 用户定）。</summary>
+    public bool ForceInstall { get; set; }
 
     /// <summary>
     /// 预计解压体积：`.app` 未压缩总量（M3 深解析的 `AppSize`，docs/07 §3.4）。
@@ -279,7 +289,7 @@ internal sealed class QueueService
     private readonly ConcurrentDictionary<string, object> _queueLocks = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// "继续"请求暂存：用户点继续时若该设备的旧泵还在收尾（取消展开中），
+    /// "Resume"请求暂存：用户点继续时若该设备的旧泵还在收尾（取消展开中），
     /// 把请求挂在这里，由旧泵的 finally 负责把 Paused 条目重新入队并重启泵。
     /// </summary>
     private readonly ConcurrentDictionary<string, byte> _resumeRequests = new(StringComparer.Ordinal);
@@ -470,7 +480,11 @@ internal sealed class QueueService
         string? packageVersion = null,
         long? expectedUncompressedBytes = null,
         string? packageMinOs = null,
-        bool? hadInstalledBefore = null)
+        bool? hadInstalledBefore = null,
+        string? packageDisplayName = null,
+        string? packageOriginText = null,
+        string? packageDeviceFamilyText = null,
+        bool forceInstall = false)
     {
         // 峰值占用要读文件元数据：**在锁外算**（硬约束 #3：锁内只做内存操作；审查 N3）
         var peakBytes = ComputePeakBytes(filePath, expectedUncompressedBytes);
@@ -519,6 +533,10 @@ internal sealed class QueueService
                 // 复审 B2：同路径重入队（比如包被换版本）必须刷新，否则泵内用旧 MinOs / 旧版本比对
                 existing.PackageVersion = packageVersion;
                 existing.PackageMinOs = packageMinOs;
+                existing.PackageDisplayName = packageDisplayName;
+                existing.PackageOriginText = packageOriginText;
+                existing.PackageDeviceFamilyText = packageDeviceFamilyText;
+                existing.ForceInstall = forceInstall;
                 existing.OrderIndex = NextOrderIndex(list, except: existing);
                 ReorderPending(list);
                 return new EnqueueResult(existing, EnqueueDisposition.Reset, existing.Status);
@@ -534,6 +552,10 @@ internal sealed class QueueService
                 PackageVersion = packageVersion,
                 ExpectedUncompressedBytes = expectedUncompressedBytes,
                 PackageMinOs = packageMinOs,
+                PackageDisplayName = packageDisplayName,
+                PackageOriginText = packageOriginText,
+                PackageDeviceFamilyText = packageDeviceFamilyText,
+                ForceInstall = forceInstall,
                 OrderIndex = NextOrderIndex(list),
                 PeakBytes = peakBytes,
                 HadInstalledBefore = hadInstalledBefore,
@@ -550,7 +572,7 @@ internal sealed class QueueService
     /// <summary>
     /// 启动该设备的泵；已有一条在跑时直接返回（单 UDID 单泵）。
     /// <para>
-    /// 竞态处理：暂停后**立刻**点"继续"时，旧泵可能已经跑完但还没走到 <c>finally</c> 把自己从
+    /// 竞态处理：暂停后**立刻**点"Resume"时，旧泵可能已经跑完但还没走到 <c>finally</c> 把自己从
     /// <see cref="_pumps"/> 里移除；这时直接 <c>TryAdd</c> 会失败，新泵起不来、队列看起来"卡住"。
     /// 所以遇到"Loop 已完成"的旧句柄时先把它清掉再试一次。
     /// </para>
@@ -590,7 +612,7 @@ internal sealed class QueueService
     }
 
     /// <summary>
-    /// 用户点"继续"：把 Paused 的条目放回 Pending，重新起泵。
+    /// 用户点"Resume"：把 Paused 的条目放回 Pending，重新起泵。
     /// <para>
     /// 必须处理一个时序窗口（B6 单元测试抓到的真实缺陷）：用户点了暂停、取消还在展开（真实场景要杀进程树，
     /// 有几十~几百 ms），此时条目还停在 <c>Installing</c> 而不是 <c>Paused</c>，旧泵也还没进 finally。
@@ -621,7 +643,7 @@ internal sealed class QueueService
         StartPump(udid);
     }
 
-    /// <summary>把该设备所有 Paused 条目放回 Pending（"继续"的公共动作）。</summary>
+    /// <summary>把该设备所有 Paused 条目放回 Pending（"Resume"的公共动作）。</summary>
     private void RequeuePausedItems(string udid)
     {
         var list = _queues.GetOrAdd(udid, _ => new List<QueueItem>());
@@ -668,7 +690,7 @@ internal sealed class QueueService
 
         if (hasInFlight)
         {
-            // 当前任务还在跑：保持"运行中"，等它结束后泵再报 Suspended。
+            // 当前任务还在跑：保持"Running"，等它结束后泵再报 Suspended。
             LogEnd(udid, "Queue suspended: current task continues; no next task will start");
         }
         else
@@ -699,7 +721,7 @@ internal sealed class QueueService
     }
 
     /// <summary>
-    /// 联机稳定后恢复：只恢复「Suspended (disconnected)」与中断 Paused；用户手动挂起的 Suspended 不动。
+    /// 联机稳定后恢复：只恢复「因断开挂起」与中断 Paused；用户手动挂起的 Suspended 不动。
     /// 用户手动挂起期间不自动恢复。
     /// </summary>
     public int ResumeAfterReconnect(string udid)
@@ -1012,7 +1034,7 @@ internal sealed class QueueService
                 current = null;
                 if (paused)
                 {
-                    // 设备级暂停：泵停住等用户点继续，不能被后面的"空闲"覆盖
+                    // 设备级暂停：泵停住等用户点继续，不能被后面的"Idle"覆盖
                     devicePaused = true;
                     break;
                 }
@@ -1024,12 +1046,12 @@ internal sealed class QueueService
             }
             else if (devicePaused)
             {
-                // 设备级暂停已有终态；不要用"空闲"覆盖它
+                // 设备级暂停已有终态；不要用"Idle"覆盖它
             }
             else if (ct.IsCancellationRequested)
             {
-                // 暂停恰好落在泵的空闲窗口（current 为 null）：也要发终态，否则界面永远显示"运行中"、
-                // "继续"永远不可点，Pending 条目也没人泵（体检报告 P1-2）。
+                // 暂停恰好落在泵的空闲窗口（current 为 null）：也要发终态，否则界面永远显示"Running"、
+                // "Resume"永远不可点，Pending 条目也没人泵（体检报告 P1-2）。
                 RaiseRunState(udid, QueueRunState.Paused, _shuttingDown ? "App closed; cancelled" : "Paused by user");
             }
             else
@@ -1039,11 +1061,11 @@ internal sealed class QueueService
         }
         catch (OperationCanceledException)
         {
-            // Paused by user / 关窗：把当前正在跑的条目停到 Paused，供"继续"恢复（07 §3.7）
+            // 用户暂停 / 关窗：把当前正在跑的条目停到 Paused，供"Resume"恢复（07 §3.7）
             // T1：原来漏了 Cancelled——用户已取消的条目会被暂停异常改回 Paused（语义丢失）
             if (current is not null && !current.Status.IsFinished())
             {
-                // 被中断过：用户点"继续"后要先回读确认是否其实已装好，避免覆盖重装清数据（07 §3.5）
+                // 被中断过：用户点"Resume"后要先回读确认是否其实已装好，避免覆盖重装清数据（07 §3.5）
                 current.WasInterrupted = true;
                 var note = _shuttingDown ? "App closed; cancelled" : "Paused by user";
                 current.Status = QueueStatus.Paused;
@@ -1067,7 +1089,7 @@ internal sealed class QueueService
                 _pumps.TryRemove(udid, out _);
             }
 
-            // 暂停后立刻继续：旧泵收尾时若还挂着"继续"请求，重新入队并重启
+            // 暂停后立刻继续：旧泵收尾时若还挂着"Resume"请求，重新入队并重启
             // （旧泵的 catch 可能刚把条目设成 Paused，所以这里要再 requeue 一次）
             if (!_shuttingDown && _resumeRequests.TryRemove(udid, out _))
             {
@@ -1177,7 +1199,7 @@ internal sealed class QueueService
             if (recovery == RecoveryOutcome.Unknown)
             {
                 // 回读失败 ≠ 没装：装下去会触发覆盖安装、重建容器清空 App 数据（AGENTS §5.7）。
-                // 设备在线 → 标"需确认"等用户决定；离线 → 暂停（保持 WasInterrupted）。
+                // 设备在线 → 标"Needs confirmation"等用户决定；离线 → 暂停（保持 WasInterrupted）。
                 var after = await SafeProbeAsync(udid, ct).ConfigureAwait(false);
                 if (!after.Present)
                     return PauseDevice(udid, item, "Pre-resume readback incomplete; device offline (result unknown)", disconnect: true);
@@ -1191,11 +1213,13 @@ internal sealed class QueueService
         // 3 版本前置校验（2026-10-31 用户要求，复审 B1 采纳挪到这里）：
         //     **先**走恢复回读——"上次中断但已装好"的条目应先记完成（避免覆盖清数据），
         //     确认没装再比 MinOs：不满足直接失败，不进入上传。
-        if (item.Kind == JobKind.Install &&
+        if (item.Kind == JobKind.Install && !item.ForceInstall &&
             VersionRules.CheckMinimumOs(item.PackageMinOs, probe.Version) is { } minOsError)
         {
             return FailItem(udid, item, "Version requirement not met: " + minOsError + " (not uploaded, forced install may be attempted)");
         }
+        if (item.Kind == JobKind.Install && item.ForceInstall)
+            LogDetail(udid, $"Force install: skip minimum iOS check ({DisplayName(item)})");
 
         // 4 执行前检查源文件（用户 2026-10-30 拍板；判据与 MainViewModel 入队检查同步维护）：
         // 存在 + 可读（被占用等 200 ms 重试一次），失败就秒判 Failed，不再拉起 ideviceinstaller 空跑 2–4 秒。
@@ -1279,8 +1303,10 @@ internal sealed class QueueService
     /// <summary>步骤 7：空间检查（清理之后）。null = 继续。</summary>
     private async Task<bool?> CheckSpaceStepAsync(string udid, QueueItem item, CancellationToken ct)
     {
-        // 7 空间检查（清理之后，07 §3.1）
-        if (item.Kind == JobKind.Install)
+        // 7 空间检查（清理之后，07 §3.1）；强制安装跳过本步骤（2026-11-08 用户定）。
+        if (item.Kind == JobKind.Install && item.ForceInstall)
+            LogDetail(udid, $"Force install: skip space check ({DisplayName(item)})");
+        else if (item.Kind == JobKind.Install)
         {
             SetStatus(udid, item, QueueStatus.SpaceCheck);
             var spaceNote = await CheckSpaceAsync(udid, item, ct).ConfigureAwait(false);
@@ -1335,7 +1361,7 @@ internal sealed class QueueService
                 // "其实装好了"：上传中断 / 断联 / 假报错都可能让 CLI 报错但 App 已装上（总览 §6.1）
                 var confirmed = await TryConfirmInstalledAfterFailureAsync(udid, item, ct).ConfigureAwait(false);
                 if (confirmed is not null)
-                    return CompleteItem(udid, item, $"Install reported an error ({reason}), but readback confirmed the install{confirmed}");
+                    return CompleteItem(udid, item, $"安装出现错误（{reason}），但回读已确认安装");
 
                 return FailItem(udid, item, "Install incomplete: " + reason);
             }
@@ -1460,11 +1486,11 @@ internal sealed class QueueService
         switch (match)
         {
             case true:
-                CompleteItem(udid, item, $"Previous run interrupted; readback confirmed {hit.Value.Version} installed; retry skipped");
+                CompleteItem(udid, item, "上次中断，回读已确认安装，已跳过重试");
                 return RecoveryOutcome.AlreadyInstalled;
             case null:
                 // 版本未知（ShortVersion / Build 都缺）：只按 BundleId 判定，不推测
-                CompleteItem(udid, item, "Previous run interrupted; readback confirmed installed (version unknown); retry skipped");
+                CompleteItem(udid, item, "上次中断，回读确认已装，已跳过重试");
                 return RecoveryOutcome.AlreadyInstalled;
             default:
                 LogDetail(udid, $"Pre-resume readback: installed {hit.Value.Version} ≠ package version {item.PackageVersion}; reinstalling");
@@ -1560,9 +1586,9 @@ internal sealed class QueueService
                 {
                     var match = InstalledAppSet.VersionsMatch(hit.Value, item.PackageVersion);
                     if (match == true)
-                        return (true, $"Readback confirmed: {hit.Value.Version} installed", false);
+                        return (true, "完成回读确认", false);
                     if (match is null)
-                        return (true, "Readback confirmed installed (version unknown)", false);
+                        return (true, "回读确认已装", false);
 
                     item.AutoRetrySuppressed = true;   // 立刻置位：后续轮次异常也绕不过
                     lastFailure = $"Device has {hit.Value.Version} installed, which does not match package version {item.PackageVersion}";
@@ -1574,7 +1600,7 @@ internal sealed class QueueService
                 if (hit is null)
                     return (true, "Readback confirmed uninstalled", false);
 
-                lastFailure = $"Readback not confirmed: {item.BundleId} is still present (version {(hit.Value.VersionKnown ? hit.Value.Version : "unknown")})";
+                lastFailure = $"Readback not confirmed: {item.BundleId} is still present (version {(hit.Value.VersionKnown ? hit.Value.Version : "未知")}）";
                 LogDetail(udid, $"Readback attempt {attempt}/{ReadbackAttempts}: {item.BundleId} still present");
             }
 
@@ -1678,7 +1704,7 @@ internal sealed class QueueService
     // ── 结果分支 ──────────────────────────────────────────────────────────────
 
     /// <summary>普通失败：记 Failed + Note，返回 false 让泵继续下一个包（07 §2 / §3.1）。</summary>
-    /// <summary>回读结果未知（设备在线）：标"需确认"，不自动重装，也不覆盖 Completed/Failed 语义。</summary>
+    /// <summary>回读结果未知（设备在线）：标"Needs confirmation"，不自动重装，也不覆盖 Completed/Failed 语义。</summary>
     /// <summary>
     /// 执行前检查源文件：返回 null = 可用；否则返回失败原因。
     /// 判据是"存在 + 可读"：被占用（IOException）等 200 ms 重试一次——杀软/索引偶发占用不该判死。
@@ -1724,6 +1750,10 @@ internal sealed class QueueService
             PackageKey = failed.PackageKey,
             PackageVersion = failed.PackageVersion,
             PackageMinOs = failed.PackageMinOs,
+            PackageDisplayName = failed.PackageDisplayName,
+            PackageOriginText = failed.PackageOriginText,
+            PackageDeviceFamilyText = failed.PackageDeviceFamilyText,
+            ForceInstall = failed.ForceInstall,
             ExpectedUncompressedBytes = failed.ExpectedUncompressedBytes,
             PeakBytes = failed.PeakBytes,
             HadInstalledBefore = failed.HadInstalledBefore,
@@ -1799,13 +1829,16 @@ internal sealed class QueueService
         return true;
     }
 
-    /// <summary>成功收尾：状态 Done + 进度 100% + 可选的 Note（回读结论写在这里）。</summary>
+    /// <summary>
+    /// 成功收尾：状态 Done + 进度 100%。**成功不再保留备注**（2026-11-08 用户定：
+    /// 完成只显示“完成”，版本交给版本列，只有失败才提示）。
+    /// </summary>
     private bool CompleteItem(string udid, QueueItem item, string? note)
     {
         item.Percent = 100;
         RaiseProgress(udid, item, 100);
-        item.Note = note;
-        SetStatus(udid, item, QueueStatus.Done, note);
+        item.Note = null;
+        SetStatus(udid, item, QueueStatus.Done, null);
         LogEnd(udid, $"Completed {DisplayName(item)}" + (note is null ? "" : $"（{note}）"));
         return false;
     }

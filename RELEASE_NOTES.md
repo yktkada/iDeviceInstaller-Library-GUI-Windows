@@ -2,6 +2,17 @@
 
 IPA library manager and installer for legacy iOS devices on Windows.
 
+## v1.0.1
+
+- Configurable queue row fields (status / note / name / version / installed size by default).
+- Queue name now uses the library app name; version is shown once in its own field.
+- Notes are shown for failed / paused / suspended tasks only.
+- Force install for a single library row (skips minimum iOS and space checks when invoked from the context menu).
+- Device apps view: multi-select, drag selection, batch uninstall and faster switching.
+- Default scan root is `<program directory>\library`.
+- English source now includes the same feature set as Chinese source.
+- Version and About panel report 1.0.1.
+
 ## Supported devices
 
 - Target: iOS 4 through iOS 10

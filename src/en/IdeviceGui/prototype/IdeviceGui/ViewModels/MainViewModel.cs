@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -40,12 +40,13 @@ internal sealed class MainViewModel : ObservableObject
     private readonly ICliRunner _cli;
     private readonly ReadbackService _readback;
     private readonly QueueService _queue;
+    private IReadOnlyList<QueueColumnSetting> _queueColumnSettings = QueueColumns.Default;
     private readonly IProgress<LogLine> _log;
 
-    /// <summary>b3a：全量日志环（2000 行）。Compact模式下界面不显示的行也存在这里，切到Detailed立刻可见。</summary>
+    /// <summary>b3a：全量日志环（2000 行）。简洁模式下界面不显示的行也存在这里，切到详细立刻可见。</summary>
     private readonly List<LogLine> _allLines = new();
 
-    /// <summary>b3a：日志面板模式（记忆在 Settings 的 <c>Log.PanelMode</c>，默认Compact）。</summary>
+    /// <summary>b3a：日志面板模式（记忆在 Settings 的 <c>Log.PanelMode</c>，默认简洁）。</summary>
     private LogMode _logMode = LogMode.Simple;
 
     /// <summary>b3b：已判定要显示、还没上屏的日志（攒够 50 ms 或切模式时一次刷出）。</summary>
@@ -87,7 +88,7 @@ internal sealed class MainViewModel : ObservableObject
     private bool _iconMatchDisplayScale = true;
     private bool _iconDownscaleCache = true;
 
-    /// <summary>「设置」窗口是否已打On（防重复On窗）。</summary>
+    /// <summary>「设置」窗口是否已打开（防重复开窗）。</summary>
     private bool _settingsWindowOpen;
 
     /// <summary>点设备页签停留 800 ms 后隐藏终态进度填充（docs/07 §3.10）。</summary>
@@ -95,7 +96,7 @@ internal sealed class MainViewModel : ObservableObject
     private FileLog? _fileLog;
     private string? _dbError;
 
-    /// <summary>文件日志是否On启（设置键 Log.ToFile；2026-11-02 起可在设置窗口改）。</summary>
+    /// <summary>文件日志是否开启（设置键 Log.ToFile；2026-11-02 起可在设置窗口改）。</summary>
     private bool _logToFile;
 
     /// <summary>
@@ -125,7 +126,7 @@ internal sealed class MainViewModel : ObservableObject
     }
 
 
-    /// <summary>程序生命周期取消源：扫描与设备刷新都挂它，Off窗时能真正取消后台工作（体检报告 P1-5）。</summary>
+    /// <summary>程序生命周期取消源：扫描与设备刷新都挂它，关窗时能真正取消后台工作（体检报告 P1-5）。</summary>
     private readonly CancellationTokenSource _lifetimeCts = new();
 
     /// <summary>M4-a：把解析批次切回 UI 上下文（Progress 在创建它的同步上下文回调）。</summary>
@@ -138,7 +139,7 @@ internal sealed class MainViewModel : ObservableObject
     private readonly LibraryView _libraryView = new();
 
     /// <summary>
-    /// 绿色（安装成功）的数据源（2026-11-02 用户定）：只存内存、按设备分On记，**只有刷新能清且只清当前设备**。
+    /// 绿色（安装成功）的数据源（2026-11-02 用户定）：只存内存、按设备分开记，**只有刷新能清且只清当前设备**。
     /// </summary>
     private readonly DeviceSuccessMarks _successMarks = new();
     private CancellationTokenSource? _indexPrefetchCts;
@@ -146,7 +147,7 @@ internal sealed class MainViewModel : ObservableObject
     private string? _lastMarkerSignature;
     private bool _lastMarkerUpdateInstalled;
 
-    /// <summary>图标解码并发闸门（4 个；与扫描的解析并发分On，互不抢）。</summary>
+    /// <summary>图标解码并发闸门（4 个；与扫描的解析并发分开，互不抢）。</summary>
     private readonly SemaphoreSlim _iconGate = new(4, 4);
 
     /// <summary>已排队、还没回来的图标加载（按行 Id 去重，避免重复解码同一张）。</summary>
@@ -209,14 +210,14 @@ internal sealed class MainViewModel : ObservableObject
     // 组行 Id 从 -1 递减（LibraryView._groupRowSeq），两段**不重叠**，按 Id 找回选中时才不会串（审核 P3-2）
     private long _nextSyntheticId = -1_000_000_000;
 
-    /// <summary>「Full rescan」的下一次扫描口径：UI 线程置位、扫描启动时读走并复位（不跨调用残留）。</summary>
+    /// <summary>「全量重扫」的下一次扫描口径：UI 线程置位、扫描启动时读走并复位（不跨调用残留）。</summary>
     private volatile bool _forceReparseForNextScan;
 
     // M4-a：分批上屏统计
     private int _parsedBatchCount;
     private int _parsedBatchRows;
 
-    // 手动Quick refresh互斥（1 = 正在扫）：连点只跑一轮
+    // 手动快速刷新互斥（1 = 正在扫）：连点只跑一轮
     private int _manualScanRunning;
 
     // 扫描期间资料库视图禁用 + 占位（2026-11-08 用户定）：扫描批次只落库，不再逐批 Build。
@@ -253,7 +254,7 @@ internal sealed class MainViewModel : ObservableObject
     /// <summary>扫描占位只盖资料库；设备应用视图不受影响（2026-11-08 用户报 bug）。</summary>
     public bool IsLibraryScanOverlayVisible => _isScanningLibrary && !_isDeviceAppsMode;
 
-    /// <summary>扫描占位文字：「Scanning library…（解析 123 / 50000）」。</summary>
+    /// <summary>扫描占位文字：「正在扫描资料库…（解析 123 / 50000）」。</summary>
     public string ScanProgressText
     {
         get => _scanProgressText;
@@ -266,14 +267,17 @@ internal sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _statusIsError, value);
     }
 
-    /// <summary>当前正在跑的扫描任务（启动扫描 / 手动刷新都登记，Off窗要等它）。</summary>
+    /// <summary>当前正在跑的扫描任务（启动扫描 / 手动刷新都登记，关窗要等它）。</summary>
     private Task? _activeScanTask;
 
-    /// <summary>Off窗时扫描没在宽限内收尾：此时不要 Dispose 库，交给进程退出（审核 P1-4）。</summary>
+    /// <summary>关窗时扫描没在宽限内收尾：此时不要 Dispose 库，交给进程退出（审核 P1-4）。</summary>
     private bool _scanShutdownIncomplete;
 
     private DeviceQueueViewModel? _selectedDevice;
     private bool _isDeviceAppsMode;
+    private bool _isDeviceAppsMultiSelectMode;
+    private HashSet<DeviceAppRow> _deviceAppsDragBaseSelection = new();
+    private readonly ConcurrentDictionary<string, byte> _deviceAppsPrefetching = new();
     private CancellationTokenSource? _deviceAppsCts;
     private string _deviceAppsSignature = "";
     private readonly ObservableCollection<DeviceAppRow> _deviceApps = new();
@@ -302,9 +306,9 @@ internal sealed class MainViewModel : ObservableObject
         AddIpaCommand = new AsyncRelayCommand(AddIpaAsync);
         EnqueueCommand = new AsyncRelayCommand(EnqueueAsync,
             () => SelectedDevice is not null && SelectedLibraryRow is { IsGroup: false });
-        ToggleLogModeCommand = new AsyncRelayCommand(ToggleLogModeAsync);   // b3a：日志面板 Compact ⇄ Detailed
+        ToggleLogModeCommand = new AsyncRelayCommand(ToggleLogModeAsync);   // b3a：日志面板 简洁 ⇄ 详细
         // 命令内部异常：状态红字 + 日志（用户 2026-10-30 拍板）。
-        // 注意别单独再订阅一次——下面这个循环已经ContainsAll命令（审核 P1-2 双重订阅）。
+        // 注意别单独再订阅一次——下面这个循环已经包含全部命令（审核 P1-2 双重订阅）。
 
         foreach (var command in new AsyncRelayCommand[]
                  {
@@ -315,16 +319,16 @@ internal sealed class MainViewModel : ObservableObject
         }
 
         RescanCommand = new AsyncRelayCommand(ManualScanAsync,
-            () => !_shuttingDown && _activeScanTask is not { IsCompleted: false });   // 手动Quick refresh（扫描中禁用，P2-6）
+            () => !_shuttingDown && _activeScanTask is not { IsCompleted: false });   // 手动快速刷新（扫描中禁用，P2-6）
         RescanCommand.Failed += ReportError;
 
-        // Full rescan（2026-10-31 用户要）：连已成功的行也重新解析，补旧版本入库后为空的深字段
+        // 全量重扫（2026-10-31 用户要）：连已成功的行也重新解析，补旧版本入库后为空的深字段
         RescanAllCommand = new AsyncRelayCommand(ManualRescanAllAsync,
             () => !_shuttingDown && _activeScanTask is not { IsCompleted: false });
         RescanAllCommand.Failed += ReportError;
 
         // 全局未处理异常（App 级）也进状态栏 + 日志。事件可能来自任意线程（AppDomain / 线程池），
-        // 所以 ReportError 内部会先切回 UI 线程；用方法引用是为了Off窗时能退订（审核 P1-2）。
+        // 所以 ReportError 内部会先切回 UI 线程；用方法引用是为了关窗时能退订（审核 P1-2）。
         App.UnhandledErrorReported += OnUnhandledError;
     }
 
@@ -349,11 +353,25 @@ internal sealed class MainViewModel : ObservableObject
         {
             if (!SetProperty(ref _isDeviceAppsMode, value)) return;
             OnPropertyChanged(nameof(IsLibraryScanOverlayVisible));
-            if (value) _ = RefreshDeviceAppsAsync();
+            if (value) _ = SafeFireAndForget.Run(RefreshDeviceAppsAsync, "Refresh device apps");
+            else
+            {
+                _deviceAppsCts?.Cancel();
+                ExitDeviceAppsMultiSelect();
+            }
         }
     }
 
     public ObservableCollection<DeviceAppRow> DeviceApps => _deviceApps;
+
+    public IReadOnlyList<QueueColumnSetting> QueueColumnSettings => _queueColumnSettings;
+
+    private void ApplyQueueColumnsToDevices()
+    {
+        var visible = QueueColumns.OrderedVisible(_queueColumnSettings);
+        foreach (var device in Devices) device.ApplyQueueColumns(visible);
+        OnPropertyChanged(nameof(QueueColumnSettings));
+    }
 
     private string _deviceAppsCountText = "Device apps: not loaded";
 
@@ -361,6 +379,37 @@ internal sealed class MainViewModel : ObservableObject
     {
         get => _deviceAppsCountText;
         private set => SetProperty(ref _deviceAppsCountText, value);
+    }
+
+    /// <summary>设备应用页的独立多选（与资料库多选互不影响）。</summary>
+    public bool IsDeviceAppsMultiSelectMode
+    {
+        get => _isDeviceAppsMultiSelectMode;
+        private set
+        {
+            if (!SetProperty(ref _isDeviceAppsMultiSelectMode, value)) return;
+            OnPropertyChanged(nameof(DeviceAppsMultiSelectButtonText));
+            OnPropertyChanged(nameof(DeviceAppsSelectedCount));
+            OnPropertyChanged(nameof(DeviceAppsBatchUninstallText));
+            OnPropertyChanged(nameof(HasSelectedDeviceApps));
+        }
+    }
+
+    public int DeviceAppsSelectedCount => DeviceApps.Count(r => r.IsMultiSelected);
+
+    public string DeviceAppsMultiSelectButtonText =>
+        IsDeviceAppsMultiSelectMode ? $"Multi-select: {DeviceAppsSelectedCount} selected" : "Multi-select: off";
+
+    public string DeviceAppsBatchUninstallText => $"Uninstall selected ({DeviceAppsSelectedCount})";
+
+    public bool HasSelectedDeviceApps => DeviceAppsSelectedCount > 0;
+
+    private void NotifyDeviceAppsSelectionChanged()
+    {
+        OnPropertyChanged(nameof(DeviceAppsSelectedCount));
+        OnPropertyChanged(nameof(DeviceAppsMultiSelectButtonText));
+        OnPropertyChanged(nameof(DeviceAppsBatchUninstallText));
+        OnPropertyChanged(nameof(HasSelectedDeviceApps));
     }
 
     /// <summary>资料库行高（DIP）；写入即持久化到 <c>Grid.RowHeight</c>（后台写，不阻塞 UI）。</summary>
@@ -388,10 +437,10 @@ internal sealed class MainViewModel : ObservableObject
     private readonly SearchScope _searchScope = new();
     private SearchMatchMode _searchMatchMode = SearchMatchMode.Contains;
 
-    /// <summary>搜索范围（多选列字段；2026-11-01 用户定：All列都能搜）。</summary>
+    /// <summary>搜索范围（多选列字段；2026-11-01 用户定：全部列都能搜）。</summary>
     public SearchScope SearchScope => _searchScope;
 
-    /// <summary>兼容性下拉框（2026-11-05）：Off / 可安装 / 已适配；选择持久化。</summary>
+    /// <summary>兼容性下拉框（2026-11-05）：关 / 可安装 / 已适配；选择持久化。</summary>
     private CompatFilterMode _compatFilterMode = CompatFilterMode.Off;
     private AdvancedFilterState _advancedFilter = new();
 
@@ -450,7 +499,7 @@ internal sealed class MainViewModel : ObservableObject
         if (mismatch && !string.Equals(_lastMismatchProduct, device?.Product, StringComparison.Ordinal))
         {
             _lastMismatchProduct = device?.Product;
-            ReportStatus($"Model evidence conflict ({device?.Product}); handled by HardwareModel");
+            ReportStatus($"Device model evidence conflict ({device?.Product}); using HardwareModel instead");
             AppendLog($"Device model evidence conflict ({device?.Product}); using HardwareModel instead", LogKind.Error);
         }
     }
@@ -492,7 +541,7 @@ internal sealed class MainViewModel : ObservableObject
     private void SaveAdvancedFilter() =>
         SaveSetting("Grid.AdvancedFilter", AdvancedFilterCodec.Serialize(_advancedFilter));
 
-    /// <summary>匹配方式：Contains / Prefix / Exact。</summary>
+    /// <summary>匹配方式：包含 / 前缀 / 精确。</summary>
     public SearchMatchMode SearchMatchMode => _searchMatchMode;
 
     /// <summary>计数文案（"N 个包 / M 组"）：重建时算一次，不再每来一行重算全表（审核 P3-7）。</summary>
@@ -512,13 +561,13 @@ internal sealed class MainViewModel : ObservableObject
     /// <summary>b3a：日志面板模式切换（2026-10-31 用户拍板；选择写进 Settings 记住）。</summary>
     public AsyncRelayCommand ToggleLogModeCommand { get; }
 
-    /// <summary>按钮文字随模式变：Compact → 「切到Detailed」，Detailed → 「切到Compact」。</summary>
+    /// <summary>按钮文字随模式变：简洁 → 「切到详细」，详细 → 「切到简洁」。</summary>
     public string LogModeButtonText => _logMode == LogMode.Simple ? "Switch to detailed view" : "Switch to compact view";
 
-    /// <summary>手动Quick refresh：只解析新增/变化的包，没变的复用库里的结果。</summary>
+    /// <summary>手动快速刷新：只解析新增/变化的包，没变的复用库里的结果。</summary>
     public AsyncRelayCommand RescanCommand { get; }
 
-    /// <summary>Full rescan：所有在位文件都重新解析一遍（含已成功的行），补深字段 / 图标。</summary>
+    /// <summary>全量重扫：所有在位文件都重新解析一遍（含已成功的行），补深字段 / 图标。</summary>
     public AsyncRelayCommand RescanAllCommand { get; }
 
     public DeviceQueueViewModel? SelectedDevice
@@ -529,7 +578,11 @@ internal sealed class MainViewModel : ObservableObject
             if (!SetProperty(ref _selectedDevice, value)) return;
             SyncLibraryDeviceContext();
             if (_compatFilterMode != CompatFilterMode.Off) RefreshLibraryRows(force: true);
-            if (_isDeviceAppsMode) _ = RefreshDeviceAppsAsync();
+            if (_isDeviceAppsMode)
+            {
+                ExitDeviceAppsMultiSelect();
+                _ = SafeFireAndForget.Run(RefreshDeviceAppsAsync, "Refresh device apps");
+            }
             EnqueueCommand.RaiseCanExecuteChanged();
             RefreshLibraryMarkers();
             StartProgressHideCountdown(value);
@@ -568,7 +621,7 @@ internal sealed class MainViewModel : ObservableObject
         timer.Start();
     }
 
-    /// <summary>网格里选中的行（组行选中只用于展On/收起，不能入队）。</summary>
+    /// <summary>网格里选中的行（组行选中只用于展开/收起，不能入队）。</summary>
     public LibraryRow? SelectedLibraryRow
     {
         get => _selectedRow;
@@ -630,7 +683,7 @@ internal sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 多选拖动On始：记录拖拽前基线；拖动范围按“每行切换”计算，而不是只选中。
+    /// 多选拖动开始：记录拖拽前基线；拖动范围按“每行切换”计算，而不是只选中。
     /// </summary>
     public bool BeginDragSelection(LibraryRow anchor)
     {
@@ -646,22 +699,36 @@ internal sealed class MainViewModel : ObservableObject
     public void SelectDragRange(LibraryRow anchor, LibraryRow current)
     {
         if (!IsMultiSelectMode) return;
-        var first = -1;
-        var last = -1;
-        for (var i = 0; i < _visibleFilteredRows.Count; i++)
-        {
-            if (ReferenceEquals(_visibleFilteredRows[i], anchor)) first = i;
-            if (ReferenceEquals(_visibleFilteredRows[i], current)) last = i;
-        }
-        if (first < 0 || last < 0) return;
-        if (first > last) (first, last) = (last, first);
-        for (var i = 0; i < _visibleFilteredRows.Count; i++)
-        {
-            var row = _visibleFilteredRows[i];
-            if (row.IsGroup || row.IsAppendedSeparator) continue;
-            row.IsMultiSelected = _dragBaseSelection.Contains(row) ^ (i >= first && i <= last);
-        }
+        if (!MultiSelectRange.Apply(
+                _visibleFilteredRows,
+                anchor,
+                current,
+                _dragBaseSelection,
+                row => row.IsGroup || row.IsAppendedSeparator))
+            return;
         NotifyMultiSelectionChanged();
+    }
+
+    /// <summary>设备应用拖动开始：与资料库同一套范围选择契约。</summary>
+    public bool BeginDeviceAppDragSelection(DeviceAppRow anchor)
+    {
+        if (!IsDeviceAppsMultiSelectMode || !DeviceApps.Contains(anchor)) return false;
+        _deviceAppsDragBaseSelection = DeviceApps.Where(r => r.IsMultiSelected).ToHashSet();
+        return true;
+    }
+
+    /// <summary>设备应用拖动范围：复用 <see cref="MultiSelectRange"/>，不另写一套反选逻辑。</summary>
+    public void SelectDeviceAppDragRange(DeviceAppRow anchor, DeviceAppRow current)
+    {
+        if (!IsDeviceAppsMultiSelectMode) return;
+        if (!MultiSelectRange.Apply(
+                DeviceApps,
+                anchor,
+                current,
+                _deviceAppsDragBaseSelection,
+                static _ => false))
+            return;
+        NotifyDeviceAppsSelectionChanged();
     }
 
     /// <summary>全选：只选当前筛选后可见的文件行，不含被筛选隐藏后追加到末尾的行。</summary>
@@ -679,7 +746,7 @@ internal sealed class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>All取消选中：清空整个选中集合（包括被筛选隐藏的已选项）。</summary>
+    /// <summary>全部取消选中：清空整个选中集合（包括被筛选隐藏的已选项）。</summary>
     public void ClearMultiSelection() => ClearMultiSelection(rebuild: true);
 
     private void ClearMultiSelection(bool rebuild)
@@ -692,7 +759,7 @@ internal sealed class MainViewModel : ObservableObject
 
     // ── 用户分组（N1） ───────────────────────────────────────────────────────
 
-    /// <summary>「All」+ 各分组；仅本次运行，不写 Settings。</summary>
+    /// <summary>「全部」+ 各分组；仅本次运行，不写 Settings。</summary>
     public ObservableCollection<GroupFilterOption> GroupFilterOptions { get; } = new() { new("All", true) };
 
     public string ActiveGroupName
@@ -712,7 +779,7 @@ internal sealed class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>把当前分组成员 Id 下发给 LibraryView（All = null）。</summary>
+    /// <summary>把当前分组成员 Id 下发给 LibraryView（全部 = null）。</summary>
     private void ApplyGroupFilter()
     {
         if (string.Equals(_activeGroupName, "All", StringComparison.Ordinal) ||
@@ -734,7 +801,7 @@ internal sealed class MainViewModel : ObservableObject
         RebuildGroupOptions();
     }
 
-    /// <summary>重建下拉集合时避免 ComboBox 的瞬时 null 把当前分组重置成「All」。</summary>
+    /// <summary>重建下拉集合时避免 ComboBox 的瞬时 null 把当前分组重置成「全部」。</summary>
     private void RebuildGroupOptions()
     {
         var active = _activeGroupName;
@@ -877,7 +944,7 @@ internal sealed class MainViewModel : ObservableObject
     }
 
     /// <param name="onLayoutReady">
-    /// On库后立刻回调一次三栏布局（M4-b1）：窗口要在扫描前把比例/隐藏状态摆好，
+    /// 开库后立刻回调一次三栏布局（M4-b1）：窗口要在扫描前把比例/隐藏状态摆好，
     /// 否则冷扫几十秒期间用户会先看到默认布局再"跳"一下。
     /// </param>
     public async Task InitializeAsync(Action<LayoutState>? onLayoutReady = null)
@@ -886,7 +953,7 @@ internal sealed class MainViewModel : ObservableObject
         _initialized = true;
 
         // 顺序有讲究：
-        // ① 先On库 + 应用布局（重启后不看到默认布局跳变）；
+        // ① 先开库 + 应用布局（重启后不看到默认布局跳变）；
         // ② 启动不再先读库内容并 Build（用户 2026-11-08 定）：设备刷新后直接进入扫描，
         //    资料库由扫描结束后的 SyncLibrary 一次性构建，省掉启动时的一次全量 Build。
         await OpenDatabaseAsync();
@@ -900,25 +967,25 @@ internal sealed class MainViewModel : ObservableObject
 
     // ── 界面布局（M4-b1，docs/01 §2 / §2.1） ─────────────────────────────────
 
-    /// <summary>读三栏布局（比例 / 日志隐藏 / 浮层宽度）；库没打On时回默认。</summary>
+    /// <summary>读三栏布局（比例 / 日志隐藏 / 浮层宽度）；库没打开时回默认。</summary>
     internal LayoutState LoadLayout() => LayoutStore.Load(_db);
 
-    /// <summary>存三栏布局；失败只写文件日志（布局存不下来不该影响Off窗）。</summary>
+    /// <summary>存三栏布局；失败只写文件日志（布局存不下来不该影响关窗）。</summary>
     internal void SaveLayout(LayoutState state) => LayoutStore.Save(_db, state, line => _fileLog?.Write(line));
 
-    /// <summary>读网格列配置（顺序 / 宽度 / 显隐）；库没打On或没写过 → 默认 10 列（M4-b2）。</summary>
+    /// <summary>读网格列配置（顺序 / 宽度 / 显隐）；库没打开或没写过 → 默认 10 列（M4-b2）。</summary>
     internal IReadOnlyList<GridColumnState> LoadGridColumns() => LibraryColumns.Load(_db);
 
-    /// <summary>存网格列配置：Off窗时按实际列状态存一次（docs/06 §3.1）。</summary>
+    /// <summary>存网格列配置：关窗时按实际列状态存一次（docs/06 §3.1）。</summary>
     internal void SaveGridColumns(IReadOnlyList<GridColumnState> states) =>
         LibraryColumns.Save(_db, states, line => _fileLog?.Write(line));
 
-    /// <summary>Off窗：取消所有泵与子进程，确保不留孤儿进程（B1 判据）；最后Off库与文件日志。</summary>
+    /// <summary>关窗：取消所有泵与子进程，确保不留孤儿进程（B1 判据）；最后关库与文件日志。</summary>
     public async Task ShutdownAsync()
     {
         if (_shuttingDown) return;
         _shuttingDown = true;
-        CancelIndexPrefetch();   // 后台预热任务进Off窗链（2026-11-04 审查 P2）
+        CancelIndexPrefetch();   // 后台预热任务进关窗链（2026-11-04 审查 P2）
         DetachAppEvents();
         try
         {
@@ -939,13 +1006,13 @@ internal sealed class MainViewModel : ObservableObject
                 }
                 catch
                 {
-                    // 取消导致的异常不阻断Off窗
+                    // 取消导致的异常不阻断关窗
                 }
             }
 
             await _queue.ShutdownAsync();
 
-            // 图标解码任务也要收尾（进度 §5.2 第 8 条）：最多等 2 s，超时不阻断Off窗
+            // 图标解码任务也要收尾（进度 §5.2 第 8 条）：最多等 2 s，超时不阻断关窗
             for (var i = 0; i < 20 && !_pendingIcons.IsEmpty; i++)
             {
                 await Task.Delay(100).ConfigureAwait(true);
@@ -964,7 +1031,7 @@ internal sealed class MainViewModel : ObservableObject
         finally
         {
             AppendLog("Application exiting", LogKind.Detail);
-            FlushLogBatchNow();   // 复审 P2-G：Off窗必须把最后一批日志刷上屏（否则"Application exiting"停在 pending）
+            FlushLogBatchNow();   // 复审 P2-G：关窗必须把最后一批日志刷上屏（否则"Application exiting"停在 pending）
             if (_queue.ShutdownIncomplete || _scanShutdownIncomplete)
             {
                 // 泵/扫描还没退出：此时释放库会让它拿到已释放对象，进程马上退出即可（审核 P1-4）。
@@ -980,7 +1047,7 @@ internal sealed class MainViewModel : ObservableObject
     /// <summary>全局未处理异常入口（可能来自任意线程）。</summary>
     private void OnUnhandledError(string message) => ReportError("Unhandled exception " + message);
 
-    /// <summary>退订 App 级静态事件（Off窗必调；单测里也要调，否则静态事件会留住 VM）。</summary>
+    /// <summary>退订 App 级静态事件（关窗必调；单测里也要调，否则静态事件会留住 VM）。</summary>
     internal void DetachAppEvents() => App.UnhandledErrorReported -= OnUnhandledError;
 
     /// <summary>异常统一出口：状态红字 + 日志（用户拍板的两处可见）。</summary>
@@ -989,9 +1056,9 @@ internal sealed class MainViewModel : ObservableObject
 
     private void ReportError(string message)
     {
-        // Off窗期第一判据（用户 2026-10-31 提前点出）：Off窗时 UI 正在拆、库与文件日志可能已 Dispose，
-        // 这时候投递 UI 状态没有意义，落文件日志也只会写进已Off闭的 FileLog（内部吞异常 → 记录丢失）。
-        // Off窗期只留 crash.log，不碰状态栏与日志集合。
+        // 关窗期第一判据（用户 2026-10-31 提前点出）：关窗时 UI 正在拆、库与文件日志可能已 Dispose，
+        // 这时候投递 UI 状态没有意义，落文件日志也只会写进已关闭的 FileLog（内部吞异常 → 记录丢失）。
+        // 关窗期只留 crash.log，不碰状态栏与日志集合。
         if (_shuttingDown)
         {
             CrashReporter.Write("MainViewModel.ReportError (shutdown)", new Exception(message));
@@ -1007,14 +1074,14 @@ internal sealed class MainViewModel : ObservableObject
                 try { AppendLog("Error: " + message, LogKind.Error); } catch { }
             }))
         {
-            // Dispatcher 已异常Off闭（没走到上面的 _shuttingDown 分支）：至少把原因留在文件日志里
+            // Dispatcher 已异常关闭（没走到上面的 _shuttingDown 分支）：至少把原因留在文件日志里
             try { _fileLog?.Write("Error: " + message); } catch { }
         }
     }
 
     /// <summary>
     /// 在 UI 线程上执行 <paramref name="action"/>（已在 UI 线程则直接执行，后台线程则投递）。
-    /// 返回 false = Dispatcher 已Off闭，动作没执行。
+    /// 返回 false = Dispatcher 已关闭，动作没执行。
     /// </summary>
     private static bool RunOnUi(Action action)
     {
@@ -1046,10 +1113,10 @@ internal sealed class MainViewModel : ObservableObject
     /// <summary>b3b：一批日志上屏后触发一次（code-behind 用它滚一次到底，**不再在 CollectionChanged 里滚**）。</summary>
     public event Action? LogLinesFlushed;
 
-    /// <summary>日志入口（b3a/b3b）：**所有**行都进全量缓冲与文件日志（Compact模式"不显示但记录"）；界面按类别过滤并 50 ms 批量上屏。</summary>
+    /// <summary>日志入口（b3a/b3b）：**所有**行都进全量缓冲与文件日志（简洁模式"不显示但记录"）；界面按类别过滤并 50 ms 批量上屏。</summary>
     private void AppendLog(LogLine line)
     {
-        if (_shuttingDown) return;   // 审查 P2-2：Off窗后文件日志/UI 集合可能已释放，迟到的后台日志直接丢弃
+        if (_shuttingDown) return;   // 审查 P2-2：关窗后文件日志/UI 集合可能已释放，迟到的后台日志直接丢弃
 
         _allLines.Add(line);
         while (_allLines.Count > MaxLogLines) _allLines.RemoveAt(0);
@@ -1096,12 +1163,12 @@ internal sealed class MainViewModel : ObservableObject
         LogLinesFlushed?.Invoke();
     }
 
-    /// <summary>日志导出的数据源：**全量内存缓冲**（不受Compact模式过滤影响）。</summary>
+    /// <summary>日志导出的数据源：**全量内存缓冲**（不受简洁模式过滤影响）。</summary>
     internal IReadOnlyList<LogLine> AllLogLines => _allLines;
 
     /// <summary>
     /// 导出全量日志到 txt（2026-11-01 用户要求）：UTF-8 带 BOM，写盘在后台线程。
-    /// 成功/失败都记一条日志（失败用 Error 类别，Compact模式也能看到）。
+    /// 成功/失败都记一条日志（失败用 Error 类别，简洁模式也能看到）。
     /// </summary>
     internal async Task ExportLogAsync(string path)
     {
@@ -1125,7 +1192,7 @@ internal sealed class MainViewModel : ObservableObject
     /// <summary>测试用：网格视图（搜索防抖阈值判断依赖它的行数）。</summary>
     internal LibraryView LibraryViewForTest => _libraryView;
 
-    /// <summary>测试/Off窗用：立刻刷掉待上屏的日志（不等 50 ms）。</summary>
+    /// <summary>测试/关窗用：立刻刷掉待上屏的日志（不等 50 ms）。</summary>
     internal void FlushLogBatchNow()
     {
         _logFlushTimer?.Dispose();
@@ -1135,7 +1202,7 @@ internal sealed class MainViewModel : ObservableObject
 
     /// <summary>
     /// 简写：不写 kind 就是过程行（Detail）。**分界行必须显式传 Start / End / Error**（b3a 复审 P0-1 口径）。
-    /// 设备相Off的行请把 <paramref name="device"/> 传进来（复审 P2-F：别一律当全局行，也**不要**再手拼 `[设备名]` Prefix）。
+    /// 设备相关的行请把 <paramref name="device"/> 传进来（复审 P2-F：别一律当全局行，也**不要**再手拼 `[设备名]` 前缀）。
     /// </summary>
     private void AppendLog(string text, LogKind kind = LogKind.Detail, DeviceInfo? device = null)
         => AppendLog(new LogLine(text, kind,
@@ -1169,7 +1236,7 @@ internal sealed class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>按当前模式从全量缓冲重建界面日志（从Compact切回Detailed时，之前隐藏的行立刻出现）。</summary>
+    /// <summary>按当前模式从全量缓冲重建界面日志（从简洁切回详细时，之前隐藏的行立刻出现）。</summary>
     private void RebuildLogLines()
     {
         _logFlushTimer?.Dispose();
@@ -1223,13 +1290,13 @@ internal sealed class MainViewModel : ObservableObject
         {
             var databasePath = Path.Combine(AppPaths.DataDirectory, "library.db");
             var db = await Task.Run(() => AppDatabase.Open(databasePath));
-            // 日志默认Off闭（用户 2026-10-30 拍板：release 默认不写 app.log；crash.log 仍然写）。
-            // 设置键 Log.ToFile=true 可显式打On，便于排障。
+            // 日志默认关闭（用户 2026-10-30 拍板：release 默认不写 app.log；crash.log 仍然写）。
+            // 设置键 Log.ToFile=true 可显式打开，便于排障。
             var logToFile = await Task.Run(() => SettingsStore.GetBool(db, SettingsStore.LogToFile, fallback: false));
-        // b3a：日志面板模式（默认Compact；坏值回默认）。此时还没有日志，重建一次即可。
+        // b3a：日志面板模式（默认简洁；坏值回默认）。此时还没有日志，重建一次即可。
         var modeRaw = await Task.Run(() => SettingsStore.GetString(db, SettingsStore.LogPanelMode));
 
-        // 搜索范围 / 匹配方式（2026-11-01 用户定：All列 + Contains/Prefix/Exact）
+        // 搜索范围 / 匹配方式（2026-11-01 用户定：全部列 + 包含/前缀/精确）
         var scopeRaw = await Task.Run(() => SettingsStore.GetString(db, LibraryPrefs.SearchScopeSettingKey));
         var scope = SearchScope.Parse(scopeRaw);
         foreach (var field in Enum.GetValues<SearchField>())
@@ -1271,7 +1338,7 @@ internal sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(LogModeButtonText));
         _logToFile = logToFile;
 
-        // 资料库行为（2026-11-02 起持久化；默认：合并On / 显示缺失On / 兼容过滤Off）
+        // 资料库行为（2026-11-02 起持久化；默认：合并开 / 显示缺失开 / 兼容过滤关）
         _libraryView.MergeSameBundle = await Task.Run(() => SettingsStore.GetBool(db, "Grid.MergeSameBundle", fallback: true));
         _libraryView.ShowMissingFiles = _showMissingFiles = await Task.Run(() => SettingsStore.GetBool(db, "Grid.ShowMissingFiles", fallback: true));
         var compatRaw = await Task.Run(() => SettingsStore.GetString(db, "Grid.CompatMode"));
@@ -1295,7 +1362,7 @@ internal sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(MissingFilterMenuText));
         OnPropertyChanged(nameof(CompatFilterMode));
 
-        // 设备（2026-11-02）：轮询间隔 1–10 s，断连自动继续默认Off
+        // 设备（2026-11-02）：轮询间隔 1–10 s，断连自动继续默认关
         _devicePollSeconds = Math.Clamp(ReadIntSetting(db, "Device.PollSeconds", 2), 1, 10);
         _autoResume = await Task.Run(() => SettingsStore.GetBool(db, "Device.AutoResumeAfterReconnect", fallback: true));
         _autoRetryAttempts = Math.Clamp(ReadIntSetting(db, "Queue.AutoRetryAttempts", 2), 2, 5);
@@ -1311,8 +1378,8 @@ internal sealed class MainViewModel : ObservableObject
             if (_fileLog.OpenError is { } fileLogError)
                 AppendLog("Failed to open file log; disabled (no functional impact): " + fileLogError, LogKind.Error);
 
-            // b3a：模式来源写进日志，便于确认"记忆"是否生效（设置键 Log.PanelMode，默认Compact）
-            AppendLog($"Log panel: {(_logMode == LogMode.Simple ? "Compact" : "Detailed")} (setting {SettingsStore.LogPanelMode}={modeRaw ?? "(empty)"})", LogKind.Detail);
+            // b3a：模式来源写进日志，便于确认"记忆"是否生效（设置键 Log.PanelMode，默认简洁）
+            AppendLog($"Log panel: {(_logMode == LogMode.Simple ? "简洁" : "详细")} (setting {SettingsStore.LogPanelMode}={modeRaw ?? "(空)"}）", LogKind.Detail);
             RebuildLogLines();
 
             _db = db;
@@ -1320,21 +1387,25 @@ internal sealed class MainViewModel : ObservableObject
             // M4-b4：设备信息行字段配置（接口预留——设置面板以后接；坏值回默认）。默认集 = 名称/型号/版本/容量/颜色/电池健康/ECID。
             var infoFieldsRaw = SettingsStore.GetString(db, DeviceInfoFields.SettingsKey);
             DeviceInfo.Fields = DeviceInfoFields.Parse(infoFieldsRaw);
+
+            var queueColumnsRaw = SettingsStore.GetString(db, QueueColumns.SettingsKey);
+            _queueColumnSettings = QueueColumns.Parse(queueColumnsRaw);
+            ApplyQueueColumnsToDevices();
             AppendLog($"Device info fields: {string.Join(" · ", DeviceInfoFields.OrderedVisible(DeviceInfo.Fields)
-                .Select(DeviceInfoFields.ToId))} (setting {DeviceInfoFields.SettingsKey}={(infoFieldsRaw is null ? "(not set)" : "Set")})", LogKind.Detail);
+                .Select(DeviceInfoFields.ToId))}（设置键 {DeviceInfoFields.SettingsKey}={(infoFieldsRaw is null ? "(not set)" : "Set")}）", LogKind.Detail);
 
             // M3：图标缓存参数从设置读；显示尺寸等 M4 定 UI 后调一次 RegisterDisplaySize 即可
             // （2026-11-02 起：这些值都在字段里，设置窗口应用时用 CreateScanner 重建，参数读法只有一处）
             CreateScanner(db);
 
             AppendLog($"Database ready: {databasePath} (user_version={db.UserVersion}, journal_mode={db.JournalMode}, " +
-                      $"busy_timeout={db.BusyTimeout} ms, file log={(logToFile ? "On" : "Off")})", LogKind.Detail);
+                      $"busy_timeout={db.BusyTimeout} ms, file log={(logToFile ? "开" : "关")}）", LogKind.Detail);
             var iconReq = _iconRequest ?? default;
             AppendLog($"Icons: display {IconDisplayPx} px × scale {iconReq.DpiScale:F2} (target {iconReq.TargetPx} px), " +
                       $"Tiers [{string.Join(",", _iconOptions!.Buckets)}], cache limit {_iconOptions.CacheMaxMb} MB, " +
-                      $"Match by scale={(_iconMatchDisplayScale ? "On" : "Off")}, downscale to tier={(_iconDownscaleCache ? "On" : "Off")}", LogKind.Detail);
+                      $"Match by scale={(_iconMatchDisplayScale ? "开" : "关")}, downscale to tier={(_iconDownscaleCache ? "开" : "关")}", LogKind.Detail);
             AppendLog($"Scan batches: save every {_scanBatchSize} rows (setting key {ScanOptions.BatchSizeKey}); " +
-                      $"Device polling {_devicePollSeconds} s; auto-resume on connect={(_autoResume ? "On" : "Off")}, reconnect stable window {_reconnectStableSeconds} s, auto-retry failures {_autoRetryAttempts} times (setting keys Device.PollSeconds / Device.AutoResumeAfterReconnect / Device.ReconnectStableSeconds / Queue.AutoRetryAttempts)", LogKind.Detail);
+                      $"Device polling {_devicePollSeconds} s; auto-resume on connect={(_autoResume ? "开" : "关")}, reconnect stable window {_reconnectStableSeconds} s, auto-retry failures {_autoRetryAttempts} times (setting keys Device.PollSeconds / Device.AutoResumeAfterReconnect / Device.ReconnectStableSeconds / Queue.AutoRetryAttempts)", LogKind.Detail);
         }
         catch (Exception ex)
         {
@@ -1342,7 +1413,7 @@ internal sealed class MainViewModel : ObservableObject
             // 数据目录可能不可写，但 logs 目录是启动自检保证过的：至少把原因留在文件里
             _fileLog ??= new FileLog(AppPaths.LogsDirectory, enabled: true);
             _fileLog.Write(_dbError);
-            // 用户 2026-10-31：On库失败必须**红字可见**（否则界面空白、以为"没数据"）
+            // 用户 2026-10-31：开库失败必须**红字可见**（否则界面空白、以为"没数据"）
             ReportError(_dbError + "— Library scan and persistence unavailable (data directory: " + AppPaths.DataDirectory + "）");
         }
     }
@@ -1511,7 +1582,7 @@ internal sealed class MainViewModel : ObservableObject
                 ReportStatus(resultSummary);
             }
 
-            // 扫描完全成功后才后台Prewarm sort index（失败/部分失败不建，避免基于不完整结果）
+            // 扫描完全成功后才后台预热排序索引（失败/部分失败不建，避免基于不完整结果）
             if (rootErrors.Count == 0 && saveFailed == 0 && saveAborted == 0 &&
                 (dataChanged || !_libraryView.HasValidPrefetch))
             {
@@ -1520,7 +1591,7 @@ internal sealed class MainViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            // Off窗取消：这不是错误，静默收尾（体检报告 P1-5）
+            // 关窗取消：这不是错误，静默收尾（体检报告 P1-5）
             AppendLog("Scan canceled (application closing)", LogKind.End);
         }
         catch (Exception ex)
@@ -1555,7 +1626,7 @@ internal sealed class MainViewModel : ObservableObject
                 var defaultFolder = _ipaFolder;
                 var (added, error) = await Task.Run(() =>
                 {
-                    try { Directory.CreateDirectory(defaultFolder); } catch { /* Add reports missing folder */ }
+                    try { Directory.CreateDirectory(defaultFolder); } catch { /* Add will report missing folder */ }
                     return ScanRootStore.Add(_db, defaultFolder);
                 });
                 if (added is not null) rows.Add(added);
@@ -1602,7 +1673,7 @@ internal sealed class MainViewModel : ObservableObject
             _successMarks.Clear(device.Device.Udid);   // 绿只清当前设备（2026-11-02 用户定）
         }
 
-        // 覆盖**All文件行**（含组收起后不在网格里的成员），否则展On组时成员还带着旧红/黄/绿
+        // 覆盖**全部文件行**（含组收起后不在网格里的成员），否则展开组时成员还带着旧红/黄/绿
         foreach (var row in _libraryView.AllFiles) row.Marker = LibraryMarker.None;
 
         // 重算：黄=仍在队列 / 红=已结束任务已清 / 绿=已清。
@@ -1654,7 +1725,7 @@ internal sealed class MainViewModel : ObservableObject
     private void ApplyBatchRows(IReadOnlyList<PackageRow> rows)
     {
         // 扫描期间不上屏（2026-11-08 用户定）：只落库，扫描结束后 SyncLibrary 一次性构建。
-        // 避免每批全量 Build 的平方级On销，也避免扫描中用户操作与行替换并发。
+        // 避免每批全量 Build 的平方级开销，也避免扫描中用户操作与行替换并发。
         if (_isScanningLibrary) return;
         _libraryView.Upsert(rows);
         RefreshLibraryRows(force: false);
@@ -1713,7 +1784,7 @@ internal sealed class MainViewModel : ObservableObject
         RefreshLibraryRows(force: true);
     }
 
-    /// <summary>同 BundleId 合并显示（默认On）。</summary>
+    /// <summary>同 BundleId 合并显示（默认开）。</summary>
     public bool LibraryMergeSameBundle
     {
         get => _libraryView.MergeSameBundle;
@@ -1764,7 +1835,7 @@ internal sealed class MainViewModel : ObservableObject
     {
         if (_db is null) return;
         lock (_settingsWriteGate) _pendingSettingsWrites.Add(new(key, value));
-        _ = SafeFireAndForget.Run(FlushSettingsAsync, "Save settings");   // 常规路径自动落库（窗口"应用"会再 await 一次确保完成）
+        _ = SafeFireAndForget.Run(FlushSettingsAsync, "Save settings");   // 常规路径自动落库（窗口"Apply"会再 await 一次确保完成）
     }
 
     /// <summary>把排队的设置一次事务写入（可 await）；失败写日志，不再静默吞掉（审查 N7）。</summary>
@@ -1800,9 +1871,9 @@ internal sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 双击组行：展On / 收起该组（P-50k B1 快路径，2026-11-04）。
+    /// 双击组行：展开 / 收起该组（P-50k B1 快路径，2026-11-04）。
     /// 只改上次拼装好的行序列，不跑 filter/sort/group，不重算 count/root；
-    /// 展On出的新可见行要补图标，选中被收起的成员行回落到组行。
+    /// 展开出的新可见行要补图标，选中被收起的成员行回落到组行。
     /// </summary>
     public void ToggleLibraryGroup(LibraryRow row)
     {
@@ -1826,7 +1897,7 @@ internal sealed class MainViewModel : ObservableObject
         var restored = RestoreLibrarySelection(keep, rows, fallbackGroupBundleId: bundleId);
         if (!ReferenceEquals(restored, keep)) SelectedLibraryRow = restored;
 
-        // 展On后成员行第一次进 LibraryRows：不补图标就要等下一次全量刷新（收起时无副作用）
+        // 展开后成员行第一次进 LibraryRows：不补图标就要等下一次全量刷新（收起时无副作用）
         LoadMissingIcons();
         perfTotal?.Stop();
         PerfProbeLog(
@@ -1834,7 +1905,7 @@ internal sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 重建网格的行序列：过滤 → 合并 → 排序（All在 <see cref="LibraryView"/> 的纯逻辑里做）。
+    /// 重建网格的行序列：过滤 → 合并 → 排序（全部在 <see cref="LibraryView"/> 的纯逻辑里做）。
     /// 批次期间按 150 ms 节流，避免每 30 行就整表刷一次；结束 / 用户操作时强制。
     /// </summary>
     private void RefreshLibraryRows(bool force)
@@ -1888,8 +1959,8 @@ internal sealed class MainViewModel : ObservableObject
         var perfSelect = perfTotal?.Elapsed.TotalMilliseconds ?? 0;
         perfTotal?.Restart();
 
-        // 2026-11-01 修 bug：计数按"过滤后的文件数 + 会成组的 BundleId 数"，与组展On/收起无Off
-        // （之前按可见行数算，展On BundleId 会让"N 个包"变化）
+        // 2026-11-01 修 bug：计数按"过滤后的文件数 + 会成组的 BundleId 数"，与组展开/收起无关
+        // （之前按可见行数算，展开 BundleId 会让"N 个包"变化）
         var (files, groups, missing) = _libraryView.LastCounts;   // C3：Build 时顺带算好，省一趟全表
         var countText = groups > 0 ? $"{files} packages / {groups} groups" : $"{files} packages";
         if (missing > 0) countText += $", {missing} missing files";
@@ -1930,8 +2001,8 @@ internal sealed class MainViewModel : ObservableObject
 
     private const long LibraryRefreshThrottleMs = 150;
 
-    // 性能探针（2026-11-04 入库，默认Off闭）：IDEVICEGUI_PERF=1 时把资料库刷新/展On收起分段写 logs\perf.log。
-    // 只在显式On环境变量时写文件；正常使用零On销、零文件。
+    // 性能探针（2026-11-04 入库，默认关闭）：IDEVICEGUI_PERF=1 时把资料库刷新/展开收起分段写 logs\perf.log。
+    // 只在显式开环境变量时写文件；正常使用零开销、零文件。
     private static readonly bool PerfProbe = Environment.GetEnvironmentVariable("IDEVICEGUI_PERF") == "1";
     private static readonly string PerfProbePath = Path.Combine(Services.AppPaths.LogsDirectory, "perf.log");
 
@@ -1952,13 +2023,13 @@ internal sealed class MainViewModel : ObservableObject
     /// <summary>给还没有图标、但有缓存键的行排一次后台解码（并发 4，解码完 <c>Freeze()</c> 后回 UI 赋值）。</summary>
     private void LoadMissingIcons()
     {
-        if (_shuttingDown) return;      // Off窗后不再起新任务（进度 §5.2 第 8 条：进Off窗链）
+        if (_shuttingDown) return;      // 关窗后不再起新任务（进度 §5.2 第 8 条：进关窗链）
         var dataDirectory = Services.AppPaths.DataDirectory;
         foreach (var row in LibraryRows)
         {
             var key = row.IconKey;
             if (key is null || row.Icon is not null) continue;
-            if (_missingIcons.ContainsKey(key)) continue;         // 已知缺失/解不On：不再重试
+            if (_missingIcons.ContainsKey(key)) continue;         // 已知缺失/解不开：不再重试
             if (!_pendingIcons.TryAdd(row.Id, 0)) continue;      // 同一行只排一次
 
             _ = SafeFireAndForget.Run(() => Task.Run(async () =>
@@ -1993,7 +2064,7 @@ internal sealed class MainViewModel : ObservableObject
         payload.Row.Icon = payload.Image;
     }
 
-    /// <summary>包一层登记：扫描任务存入 <see cref="_activeScanTask"/>，Off窗时统一等待（审核 P1-4/P1-5）。</summary>
+    /// <summary>包一层登记：扫描任务存入 <see cref="_activeScanTask"/>，关窗时统一等待（审核 P1-4/P1-5）。</summary>
     private Task RunScanTrackedAsync()
     {
         var task = ScanIpasAsync();
@@ -2008,7 +2079,7 @@ internal sealed class MainViewModel : ObservableObject
     private Task ManualScanAsync() => RunManualScanAsync(forceReparse: false, label: "Quick refresh");
 
     /// <summary>
-    /// Full rescan：与Quick refresh走同一条扫描，但解析阶段**连 Ok 行也重解析**（`ScanOptions.ForceReparse`），
+    /// 全量重扫：与快速刷新走同一条扫描，但解析阶段**连 Ok 行也重解析**（`ScanOptions.ForceReparse`），
     /// 用来补旧版本入库、深字段为空的行。同样受手动扫描互斥约束（连点只跑一轮）。
     /// </summary>
     private Task ManualRescanAllAsync() => RunManualScanAsync(forceReparse: true, label: "Full rescan");
@@ -2042,8 +2113,8 @@ internal sealed class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>把库里的All行并进网格（M4-b2）：按 `Packages.Id` 复用行对象、原地更新，不整表重建（硬约束 #8）。</summary>
-    /// <summary>取消正在进行的索引预热（新一轮扫描On始 / 数据要变时调用）。</summary>
+    /// <summary>把库里的全部行并进网格（M4-b2）：按 `Packages.Id` 复用行对象、原地更新，不整表重建（硬约束 #8）。</summary>
+    /// <summary>取消正在进行的索引预热（新一轮扫描开始 / 数据要变时调用）。</summary>
     private void CancelIndexPrefetch()
     {
         var cts = _indexPrefetchCts;
@@ -2115,7 +2186,7 @@ internal sealed class MainViewModel : ObservableObject
             case JobStatusEvent j:
                 if (j.Status == QueueStatus.Done)
                 {
-                    // 2026-11-02 用户定：队列**安装成功** → 记一条绿色（临时，只存内存、按设备分On记，刷新即清）
+                    // 2026-11-02 用户定：队列**安装成功** → 记一条绿色（临时，只存内存、按设备分开记，刷新即清）
                     // 2026-11-03 审查 A4/B3 修复：**卸载成功要清掉该包绿**（含"装完自动卸载"的临时条目）
                     if (j.Kind == JobKind.Uninstall) _successMarks.Clear(j.Udid, j.BundleId);
                     else RecordInstallSuccess(j);
@@ -2143,7 +2214,7 @@ internal sealed class MainViewModel : ObservableObject
                 device?.Apply(i);
                 _ = SafeFireAndForget.Run(() => RunSpaceProjectionAfterReadbackAsync(i.Udid), "Space precheck");
                 if (device is not null && ReferenceEquals(device, SelectedDevice) && _isDeviceAppsMode)
-                    _ = RefreshDeviceAppsAsync();
+                    _ = SafeFireAndForget.Run(RefreshDeviceAppsAsync, "Refresh device apps");
                 break;
         }
 
@@ -2163,7 +2234,8 @@ internal sealed class MainViewModel : ObservableObject
 
         try
         {
-            var snapshot = _queue.Snapshot(udid);
+            // 强制安装明确跳过空间检查：不参与回读后的空间预演，也不产生“装不下”提示。
+            var snapshot = _queue.Snapshot(udid).Where(x => !x.ForceInstall).ToList();
             var hasInstall = snapshot.Any(x => x.Kind == JobKind.Install &&
                                                !x.Status.IsFinished() &&
                                                !x.Status.IsInFlight());
@@ -2183,7 +2255,7 @@ internal sealed class MainViewModel : ObservableObject
                 return;
             }
 
-            if (_shuttingDown) return;   // await 之后复核，避免Off窗后写日志
+            if (_shuttingDown) return;   // await 之后复核，避免关窗后写日志
             if (!usage.Ok)
             {
                 _spaceWarnings.TryRemove(udid, out _);
@@ -2204,7 +2276,7 @@ internal sealed class MainViewModel : ObservableObject
             if (_spaceWarnings.TryGetValue(udid, out var last) && last.Version == version && last.Key == key)
                 return;
 
-            if (_shuttingDown) return;   // Off窗后不再写日志
+            if (_shuttingDown) return;   // 关窗后不再写日志
             _spaceWarnings[udid] = (version, key);
             var queue = Devices.FirstOrDefault(d =>
                 string.Equals(d.Device.Udid, udid, StringComparison.Ordinal));
@@ -2218,7 +2290,7 @@ internal sealed class MainViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            // Off窗/取消：正常收尾。
+            // 关窗/取消：正常收尾。
         }
         finally
         {
@@ -2241,7 +2313,7 @@ internal sealed class MainViewModel : ObservableObject
 
     /// <summary>
     /// 记一条「这台设备装成功了这个包」（绿色提示的唯一来源，2026-11-02 用户定）：
-    /// 身份 = BundleId + 入队版本（与 ✓ 的Exact匹配同口径）；只有安装任务算，卸载成功不染绿。
+    /// 身份 = BundleId + 入队版本（与 ✓ 的精确匹配同口径）；只有安装任务算，卸载成功不染绿。
     /// </summary>
     private void RecordInstallSuccess(JobStatusEvent e)
     {
@@ -2327,7 +2399,7 @@ internal sealed class MainViewModel : ObservableObject
             identityVisual[PackageIdentity(row)] = visualByBundle[row.BundleId];
         }
 
-        // 普通行：**遍历All文件行**（含被搜索过滤 / 组收起后不在网格里的成员）。
+        // 普通行：**遍历全部文件行**（含被搜索过滤 / 组收起后不在网格里的成员）。
         foreach (var row in _libraryView.AllFiles)
         {
             if (updateInstalled)
@@ -2349,7 +2421,7 @@ internal sealed class MainViewModel : ObservableObject
                 {
                     if (item.Kind == JobKind.Install)
                     {
-                        // 安装：优先Exact路径；否则按包身份共享颜色
+                        // 安装：优先精确路径；否则按包身份共享颜色
                         if (string.Equals(item.PackageKey, row.FilePath, StringComparison.OrdinalIgnoreCase) ||
                             identityVisual.ContainsKey(PackageIdentity(row)))
                             visual = candidate;
@@ -2432,7 +2504,7 @@ internal sealed class MainViewModel : ObservableObject
 
     // ── 设置（2026-11-02 用户定：设置窗口，docs/01 §2.4 / docs/09 §3.2）──────────
 
-    /// <summary>设置窗口是否已打On（防重复On窗）。</summary>
+    /// <summary>设置窗口是否已打开（防重复开窗）。</summary>
     public bool TryBeginOpenSettings()
     {
         if (_settingsWindowOpen) return false;
@@ -2468,6 +2540,7 @@ internal sealed class MainViewModel : ObservableObject
         ReconnectStableSeconds = _reconnectStableSeconds,
         AutoRetryAttempts = _autoRetryAttempts,
         DeviceFields = DeviceInfo.Fields.ToList(),
+        QueueColumns = _queueColumnSettings.ToList(),
     };
 
     /// <summary>设置窗口显示用：排序/搜索范围显示“已保存的默认值”，其余仍是当前状态。</summary>
@@ -2629,6 +2702,14 @@ internal sealed class MainViewModel : ObservableObject
             foreach (var device in Devices) device.Device.RefreshInfoLine();
             if (persist) SaveSetting(DeviceInfoFields.SettingsKey, DeviceInfoFields.Serialize(DeviceInfo.Fields));
         }
+
+        // ⑨ 队列行字段（顺序 + 可见性；Display 字符串重新拼）
+        if (!_queueColumnSettings.SequenceEqual(draft.QueueColumns))
+        {
+            _queueColumnSettings = draft.QueueColumns.ToList();
+            ApplyQueueColumnsToDevices();
+        }
+        if (persist) SaveSetting(QueueColumns.SettingsKey, QueueColumns.Serialize(_queueColumnSettings));
     }
 
     private void ApplyLogToFile(bool enabled, bool persist)
@@ -2732,11 +2813,11 @@ internal sealed class MainViewModel : ObservableObject
 
     /// <summary>
     /// 扫描根增删后的扫描入口（审查 N3，2026-11-03）：先等正在跑的扫描收尾（避免"刚删根、旧扫描还在写该根"→ FK 违约），
-    /// 再走与手动刷新同一套互斥 + <see cref="RunScanTrackedAsync"/>（登记Off窗链）。
+    /// 再走与手动刷新同一套互斥 + <see cref="RunScanTrackedAsync"/>（登记关窗链）。
     /// </summary>
     private async Task ScanAfterRootChangeAsync()
     {
-        // 等当前扫描收尾（最多等 30 s；Off窗/取消时直接退出）
+        // 等当前扫描收尾（最多等 30 s；关窗/取消时直接退出）
         var deadline = Environment.TickCount64 + 30_000;
         while (!_shuttingDown && Environment.TickCount64 < deadline)
         {
@@ -2886,6 +2967,7 @@ internal sealed class MainViewModel : ObservableObject
                         Online = true,
                     };
                     var queueVm = new DeviceQueueViewModel(_queue, device);
+                    queueVm.ApplyQueueColumns(QueueColumns.OrderedVisible(_queueColumnSettings));
                     queueVm.Device.PropertyChanged += (_, args) =>
                     {
                         if (args.PropertyName == nameof(DeviceInfo.Online)) OnDeviceOnlineChanged(queueVm);
@@ -2902,7 +2984,7 @@ internal sealed class MainViewModel : ObservableObject
                     existing.Device.Product = probe.ProductType;
                     existing.Device.Version = probe.Version;
                     existing.Device.CpuArch = probe.CpuArch;
-                    existing.MarkOnline();   // 2026-11-02：插回时把 Offline 复位 Idle（否则一直显示"设备离线"）
+                    existing.MarkOnline();   // 2026-11-02：插回时把 Offline 复位 Idle（否则一直显示"Device offline"）
                     _queue.SetDeviceIdentity(udid, probe.ProductType, probe.Version, probe.Name);
                     ApplyProbe(existing.Device, probe);
                     _ = SafeFireAndForget.Run(() => RefreshDeviceDetailAsync(existing.Device), "Read device details");
@@ -2921,7 +3003,7 @@ internal sealed class MainViewModel : ObservableObject
                 SelectedDevice = Devices.FirstOrDefault(d => d.Device.Online) ?? Devices.FirstOrDefault();
 
             var onlineCount = Devices.Count(d => d.Device.Online);
-            // 审查 A5：0 台在线常出现在"设备在列表里但探测失败"的抖动期，别用 End 级刷屏（Compact模式可见）
+            // 审查 A5：0 台在线常出现在"设备在列表里但探测失败"的抖动期，别用 End 级刷屏（简洁模式可见）
             AppendLog($"Device refresh complete: {onlineCount} online / {Devices.Count} total",
                 onlineCount == 0 ? LogKind.Detail : LogKind.End);
 
@@ -2935,7 +3017,7 @@ internal sealed class MainViewModel : ObservableObject
             ReportStatus($"Device refresh complete: {onlineCount} online / {Devices.Count} total");   // 成功即清掉旧红字（审核 P2-6）
             await PersistDevicesAsync();
 
-            // 刷新设备后Read back installed apps（07 §3.5 / 06 §3.4 的 InstalledBundleIds）；后台做，不挡 UI
+            // 刷新设备后回读已安装集合（07 §3.5 / 06 §3.4 的 InstalledBundleIds）；后台做，不挡 UI
             foreach (var device in Devices.Where(d => d.Device.Online).ToList())
             {
                 _ = SafeFireAndForget.Run(() => PrefetchInstalledAsync(device.Device.Udid), "Read back installed apps");
@@ -3030,8 +3112,8 @@ internal sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 联机稳定窗口（2026-11-07 用户定）：设备重新在线后等待配置秒数；期间再次断On则重新计时。
-    /// 稳定后只恢复「因断On挂起」与中断 Paused；用户手动挂起的保持。
+    /// 联机稳定窗口（2026-11-07 用户定）：设备重新在线后等待配置秒数；期间再次断开则重新计时。
+    /// 稳定后只恢复「因断开挂起」与中断 Paused；用户手动挂起的保持。
     /// </summary>
     private void ScheduleReconnectResume(DeviceQueueViewModel queueVm)
     {
@@ -3090,7 +3172,7 @@ internal sealed class MainViewModel : ObservableObject
     /// </summary>
     private async Task RefreshDeviceDetailAsync(DeviceInfo device)
     {
-        if (_shuttingDown) return;          // 审查 P2-2：Off窗后不再起新的 CLI 任务
+        if (_shuttingDown) return;          // 审查 P2-2：关窗后不再起新的 CLI 任务
         if (!_detailRefreshing.TryAdd(device.Udid, 0)) return;
 
         try
@@ -3106,9 +3188,9 @@ internal sealed class MainViewModel : ObservableObject
             device.SetSpace(space);
             device.SetBattery(usage, health, spec);
             AppendLog(
-                $"Device info: {device.ShortName} capacity {(space.Ok ? device.SpaceText : "unknown")}, " +
-                $"battery {(usage.HasValue ? usage.Display : "unknown")}, " +
-                $"health {(health.HasValue ? device.BatteryHealthText : "unknown")}",
+                $"Device info: {device.ShortName} capacity {(space.Ok ? device.SpaceText : "未知")}、" +
+                $"battery {(usage.HasValue ? usage.Display : "未知")}、" +
+                $"health {(health.HasValue ? device.BatteryHealthText : "未知")}",
                 LogKind.Detail);
         }
         catch (Exception ex)
@@ -3139,7 +3221,7 @@ internal sealed class MainViewModel : ObservableObject
 
             await Task.Run(() =>
             {
-                // 一次事务写完 + 短上限（2 s）：设备快照不是Off键数据，库被外部锁住时不该把启动拖住
+                // 一次事务写完 + 短上限（2 s）：设备快照不是关键数据，库被外部锁住时不该把启动拖住
                 // （实测逐台 upsert 会每台各等满 busy_timeout，3 台约 33 s）。
                 DeviceStore.UpsertMany(_db, snapshot, waitMs: 2000, busyTimeoutMs: 2000);
             });
@@ -3182,6 +3264,14 @@ internal sealed class MainViewModel : ObservableObject
         if (queue is null || ipa is null || ipa.IsGroup) return Task.CompletedTask;
         TryEnqueueRowAsync(queue, ipa);
         return Task.CompletedTask;
+    }
+
+    /// <summary>右键单行「强制安装到当前设备」：只跳过最低 iOS 与空间检查，其他校验照旧。</summary>
+    internal bool ForceInstallToCurrentDevice(LibraryRow? row)
+    {
+        var queue = SelectedDevice;
+        if (queue is null || row is null || row.IsGroup) return false;
+        return TryEnqueueRowAsync(queue, row, forceInstall: true);
     }
 
     /// <summary>
@@ -3239,27 +3329,28 @@ internal sealed class MainViewModel : ObservableObject
 
         if (job.Status != QueueStatus.Done) return;
 
-        EnqueueUninstall(queue, job.BundleId, job.FileName);
+        EnqueueUninstall(queue, job.BundleId, job.DisplayNameText);
     }
 
     /// <summary>
     /// 卸载入队（队列双击 / 设备应用双击共用）：不做 Probe，检查交给 QueueService。
     /// </summary>
-    internal void EnqueueUninstall(DeviceQueueViewModel queue, string bundleId, string displayName)
+    internal bool EnqueueUninstall(DeviceQueueViewModel queue, string bundleId, string displayName)
     {
         var enqueued = _queue.Enqueue(queue.Device.Udid, JobKind.Uninstall, bundleId,
-            filePath: null, packageKey: null, packageVersion: null);
+            filePath: null, packageKey: null, packageVersion: null,
+            packageDisplayName: string.IsNullOrWhiteSpace(displayName) ? null : displayName);
         if (enqueued.Disposition == EnqueueDisposition.AlreadyRunning)
         {
             ReportStatus($"[{queue.Device.ShortName}] uninstall already queued: {bundleId}");
-            return;
+            return false;
         }
 
         if (enqueued.Disposition == EnqueueDisposition.KindConflict)
         {
             AppendLog($"Uninstall rejected: {bundleId} still has an install task in the queue ({enqueued.CurrentStatus.ToText()})", LogKind.Error, queue.Device);
             ReportError($"Uninstall rejected: [{queue.Device.ShortName}] still has an install task for this package ({enqueued.CurrentStatus.ToText()})");
-            return;
+            return false;
         }
 
         queue.AddJob(enqueued.Item);
@@ -3268,6 +3359,7 @@ internal sealed class MainViewModel : ObservableObject
         if (_isDeviceAppsMode) RefreshDeviceAppsMarkers();
         AppendLog($"Added to uninstall queue: {displayName} ({bundleId})", LogKind.End, queue.Device);
         ReportStatus($"[{queue.Device.ShortName}] added to uninstall queue: {displayName}");
+        return true;
     }
 
     /// <summary>设备应用行双击：卸载该 BundleId（与队列双击同一个入队接口）。</summary>
@@ -3276,6 +3368,66 @@ internal sealed class MainViewModel : ObservableObject
         var queue = SelectedDevice;
         if (queue is null) return;
         EnqueueUninstall(queue, row.BundleId, row.Name);
+    }
+
+    /// <summary>切换设备应用页多选；只在设备应用视图使用。</summary>
+    public void ToggleDeviceAppsMultiSelectMode()
+    {
+        IsDeviceAppsMultiSelectMode = !IsDeviceAppsMultiSelectMode;
+        if (!IsDeviceAppsMultiSelectMode) ClearDeviceAppsSelection();
+        NotifyDeviceAppsSelectionChanged();
+    }
+
+    /// <summary>设备应用单击：多选模式下切换该行选中，返回 true 表示已处理。</summary>
+    public bool ToggleDeviceAppMultiSelect(DeviceAppRow row)
+    {
+        if (!IsDeviceAppsMultiSelectMode) return false;
+        row.IsMultiSelected = !row.IsMultiSelected;
+        NotifyDeviceAppsSelectionChanged();
+        return true;
+    }
+
+    public void SelectAllDeviceApps()
+    {
+        if (!IsDeviceAppsMultiSelectMode) return;
+        foreach (var row in DeviceApps) row.IsMultiSelected = true;
+        NotifyDeviceAppsSelectionChanged();
+    }
+
+    public void ClearDeviceAppsSelection()
+    {
+        foreach (var row in DeviceApps)
+            if (row.IsMultiSelected) row.IsMultiSelected = false;
+        NotifyDeviceAppsSelectionChanged();
+    }
+
+    /// <summary>退出设备应用多选并清空选择（切走视图 / 换设备时调用）。</summary>
+    public void ExitDeviceAppsMultiSelect()
+    {
+        IsDeviceAppsMultiSelectMode = false;
+        ClearDeviceAppsSelection();
+    }
+
+    /// <summary>批量卸载：所有选中行复用同一个卸载入队接口，不复制 QueueService 逻辑。</summary>
+    public void UninstallSelectedDeviceApps()
+    {
+        var queue = SelectedDevice;
+        if (queue is null) return;
+        var selected = DeviceApps
+            .Where(r => r.IsMultiSelected)
+            .GroupBy(r => r.BundleId, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+        if (selected.Count == 0) return;
+
+        var accepted = selected.Count(row => EnqueueUninstall(queue, row.BundleId, row.Name));
+        ClearDeviceAppsSelection();
+        IsDeviceAppsMultiSelectMode = false;
+        var rejected = selected.Count - accepted;
+        AppendLog($"Batch uninstall: submitted {accepted} apps" +
+                  (rejected > 0 ? $"，拒绝 {rejected} 个" : ""), LogKind.End, queue.Device);
+        ReportStatus($"[{queue.Device.ShortName}] Batch uninstall: submitted {accepted} apps" +
+                     (rejected > 0 ? $"，拒绝 {rejected} 个" : ""));
     }
 
     /// <summary>刷新当前设备“设备应用”列表（只取已回读的用户 App，不含系统 App）。</summary>
@@ -3309,12 +3461,17 @@ internal sealed class MainViewModel : ObservableObject
 
     private async Task RefreshDeviceAppsAsync()
     {
+        // 先让切换动作回到消息循环：设备应用页先显示出来，再构建行与取图标，
+        // 避免设备 App 较多时切换按钮看起来“卡住”。
+        await Task.Yield();
+
         var queue = SelectedDevice;
         if (queue is null)
         {
             DeviceApps.Clear();
             _deviceAppsSignature = "";
             DeviceAppsCountText = "Device apps: no device";
+            ExitDeviceAppsMultiSelect();
             return;
         }
 
@@ -3324,6 +3481,15 @@ internal sealed class MainViewModel : ObservableObject
             DeviceApps.Clear();
             _deviceAppsSignature = "";
             DeviceAppsCountText = "Device apps: reading…";
+            ExitDeviceAppsMultiSelect();
+            if (_deviceAppsPrefetching.TryAdd(queue.Device.Udid, 0))
+            {
+                _ = SafeFireAndForget.Run(async () =>
+                {
+                    try { await PrefetchInstalledAsync(queue.Device.Udid); }
+                    finally { _deviceAppsPrefetching.TryRemove(queue.Device.Udid, out _); }
+                }, "设备应用回读");
+            }
             return;
         }
 
@@ -3337,10 +3503,8 @@ internal sealed class MainViewModel : ObservableObject
         var cts = new CancellationTokenSource();
         _deviceAppsCts = cts;
 
-        DeviceApps.Clear();
-        _deviceAppsSignature = signature;
-
-        var rows = installed
+        // 行构建放到后台；UI 线程只做一次集合替换。旧行在构建期间保留，避免切页时闪空表。
+        var rows = await Task.Run(() => installed
             .Select(a => new DeviceAppRow
             {
                 BundleId = a.BundleId,
@@ -3348,8 +3512,13 @@ internal sealed class MainViewModel : ObservableObject
                 VersionText = a.VersionKnown ? a.Version : "Version unknown",
             })
             .OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+            .ToList(), cts.Token).ConfigureAwait(true);
+        if (cts.IsCancellationRequested || !ReferenceEquals(SelectedDevice, queue)) return;
+
+        DeviceApps.Clear();
         foreach (var row in rows) DeviceApps.Add(row);
+        _deviceAppsSignature = signature;
+        ClearDeviceAppsSelection();
         DeviceAppsCountText = $"Device apps: {rows.Count}";
         RefreshDeviceAppsMarkers();
 
@@ -3406,7 +3575,7 @@ internal sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>把一行 IPA 加入指定设备队列（单包入队与双击入队共用；入队检查见 docs/07 §12）。</summary>
-    private bool TryEnqueueRowAsync(DeviceQueueViewModel queue, LibraryRow ipa, bool fileExistsChecked = false)
+    private bool TryEnqueueRowAsync(DeviceQueueViewModel queue, LibraryRow ipa, bool fileExistsChecked = false, bool forceInstall = false)
     {
         // 入队前提：包已解析出 BundleId（07 §2）；解析失败不允许入队
         if (string.IsNullOrWhiteSpace(ipa.BundleId))
@@ -3423,15 +3592,21 @@ internal sealed class MainViewModel : ObservableObject
             return false;
         }
 
-        // 2026-11-05 用户定：瞬间入队——设备在线/身份、文件可读、空间检查All延后到
+        // 2026-11-05 用户定：瞬间入队——设备在线/身份、文件可读、空间检查全部延后到
         // QueueService 的泵内（安装前复用 Probe / ReadbackService）；这里只做内存检查。
         // 版本前置校验仍保留（纯内存，用的是刷新时已知的设备版本）。
-        if (VersionRules.CheckMinimumOs(ipa.MinOs, queue.Device.Version) is { } minOsError)
+        if (!forceInstall &&
+            VersionRules.CheckMinimumOs(ipa.MinOs, queue.Device.Version) is { } minOsError)
         {
             AppendLog($"Enqueue rejected: {ipa.NameText} {minOsError}" +
-                      "(not uploaded; forced install is not available in this release; replace or repackage the IPA)", LogKind.Error, queue.Device);
+                      "（未上传；可右键该行使用强制安装）", LogKind.Error, queue.Device);
             ReportStatus($"Rejected: {ipa.NameText} {minOsError}");
             return false;
+        }
+        if (forceInstall)
+        {
+            AppendLog($"Force install: {ipa.NameText} (skip minimum iOS and space checks)", LogKind.End, queue.Device);
+            ReportStatus($"[{queue.Device.ShortName}] Force install: {ipa.NameText}");
         }
 
         // 覆盖安装：2026-11-01 用户决定不再提示、不弹确认（“老 iOS 没什么重要数据”）。
@@ -3442,9 +3617,13 @@ internal sealed class MainViewModel : ObservableObject
             ipa.BundleId,
             ipa.FilePath,
             packageKey: ipa.FilePath,
-            packageVersion: ipa.PackageVersionForQueue,   // Version unknown给 null（审核 P2-2）
+            packageVersion: ipa.PackageVersionForQueue,   // 版本未知给 null（审核 P2-2）
             expectedUncompressedBytes: ipa.AppSize > 0 ? ipa.AppSize : null,
-            packageMinOs: string.IsNullOrWhiteSpace(ipa.MinOs) ? null : ipa.MinOs);
+            packageMinOs: string.IsNullOrWhiteSpace(ipa.MinOs) ? null : ipa.MinOs,
+            packageDisplayName: string.IsNullOrWhiteSpace(ipa.Name) ? null : ipa.Name,
+            packageOriginText: string.IsNullOrWhiteSpace(ipa.OriginText) ? null : ipa.OriginText,
+            packageDeviceFamilyText: string.IsNullOrWhiteSpace(ipa.DeviceFamilyText) ? null : ipa.DeviceFamilyText,
+            forceInstall: forceInstall);
 
         switch (enqueued.Disposition)
         {

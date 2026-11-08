@@ -1,14 +1,14 @@
-﻿<Window x:Class="IdeviceGui.Views.MainWindow"
+<Window x:Class="IdeviceGui.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:IdeviceGui.Views"
-        Title="iDeviceInstaller+Library" Icon="/app.ico" Height="760" Width="1180" MinHeight="720"
-        WindowStartupLocation="CenterScreen">
+        Title="iDeviceInstaller+Library" Height="760" Width="1180" MinHeight="720"
+        WindowStartupLocation="CenterScreen" Icon="/app.ico">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <!-- 2026-11-01 用户定：选中改灰（蓝只留给双击 armed），单元格去掉焦点黑框 -->
         <SolidColorBrush x:Key="SelectedRowBrush" Color="#FFE6E6E6" />
-        <!-- 2026-11-02 用户定：绿色 = 队列安装成功后的临时提示（行底色 / 组行Icon列底色） -->
+        <!-- 2026-11-02 用户定：绿色 = 队列安装成功后的临时提示（行底色 / 组行图标列底色） -->
         <SolidColorBrush x:Key="InstalledRowBrush" Color="#FFD9F2D9" />
         <SolidColorBrush x:Key="InstalledOtherRowBrush" Color="#FFD6E9FF" />
         <SolidColorBrush x:Key="ArmedRowBrush" Color="#FF2F6FD0" />
@@ -33,7 +33,7 @@
                     <Setter Property="Background" Value="{StaticResource SelectedRowBrush}" />
                     <Setter Property="Foreground" Value="#FF000000" />
                 </Trigger>
-                <!-- 文件行：统一操作色；组行不铺行色，组行Status只画在 icon 列 -->
+                <!-- 文件行：统一操作色；组行不铺行色，组行状态只画在 icon 列 -->
                 <MultiDataTrigger>
                     <MultiDataTrigger.Conditions>
                         <Condition Binding="{Binding IsGroup}" Value="False" />
@@ -104,7 +104,7 @@
                     <Setter Property="Background" Value="{StaticResource ArmedRowBrush}" />
                     <Setter Property="Foreground" Value="#FFFFFFFF" />
                 </DataTrigger>
-                <!-- 多选选中：复用 armed 蓝色；只由多选模式Settings -->
+                <!-- 多选选中：复用 armed 蓝色；只由多选模式设置 -->
                 <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
                     <Setter Property="Background" Value="{StaticResource ArmedRowBrush}" />
                     <Setter Property="Foreground" Value="#FFFFFFFF" />
@@ -122,8 +122,8 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-        <!-- Device apps行样式：直接复制 LibraryRowStyle 的颜色/armed 逻辑（2026-11-06 用户要求复制粘贴 + 注释）。
-             不绑定 IsGroup / IsGroupEnd，Device apps没有组行。 -->
+        <!-- 设备应用行样式：直接复制 LibraryRowStyle 的颜色/armed 逻辑（2026-11-06 用户要求复制粘贴 + 注释）。
+             不绑定 IsGroup / IsGroupEnd，设备应用没有组行。 -->
         <Style x:Key="DeviceAppRowStyle" TargetType="DataGridRow">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Style.Triggers>
@@ -156,18 +156,45 @@
                     <Setter Property="Background" Value="{StaticResource ArmedRowBrush}" />
                     <Setter Property="Foreground" Value="#FFFFFFFF" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource ArmedRowBrush}" />
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
-        <!-- Device apps单元格：必须把单元格背景设为透明，否则 DataGrid 默认选中蓝会盖住整行颜色。
+        <!-- 设备应用单元格：必须把单元格背景设为透明，否则 DataGrid 默认选中蓝会盖住整行颜色。
              2026-11-06 实测：之前只设 RowStyle，单击看到的是系统选中蓝，不是 armed 深蓝。 -->
         <Style x:Key="DeviceAppCellStyle" TargetType="DataGridCell">
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="#FF000000" />
+            <Setter Property="TextElement.Foreground" Value="#FF000000" />
             <Setter Property="BorderBrush" Value="#FFC8C8C8" />
             <Setter Property="BorderThickness" Value="0,0,0.5,0" />
             <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                    <Setter Property="TextElement.Foreground" Value="#FFFFFFFF" />
+                </Trigger>
                 <DataTrigger Binding="{Binding IsArmed}" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                    <Setter Property="TextElement.Foreground" Value="#FFFFFFFF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                    <Setter Property="TextElement.Foreground" Value="#FFFFFFFF" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- 设备应用文字：DataGridTextColumn 的 TextBlock 不继承 DataGridCell.Foreground，
+             这里显式给 ElementStyle，多选/armed 时把字刷白。 -->
+        <Style x:Key="DeviceAppTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FF000000" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsArmed}" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFFFF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
                     <Setter Property="Foreground" Value="#FFFFFFFF" />
                 </DataTrigger>
             </Style.Triggers>
@@ -193,14 +220,14 @@
                     <Setter Property="Foreground" Value="#FFFFFFFF" />
                 </DataTrigger>
             </Style.Triggers></Style>
-        <!-- 勾列 / Icon列不画竖向分割线（2026-11-02 用户定） -->
+        <!-- 勾列 / 图标列不画竖向分割线（2026-11-02 用户定） -->
         <Style x:Key="LibraryCellStyleNoSeparator" TargetType="DataGridCell" BasedOn="{StaticResource LibraryCellStyle}">
             <Setter Property="BorderThickness" Value="0" />
         </Style>
         <!-- ✓ 列（2026-11-02 用户定）：**打勾的行 → 勾列整格绿底**（与安装成功同色），勾本身仍是黑色。
              优先于选中灰；armed（深蓝）时让位，避免蓝行里亮一块绿。 -->
         <Style x:Key="LibraryInstalledCellStyle" TargetType="DataGridCell" BasedOn="{StaticResource LibraryCellStyleNoSeparator}">
-            <!-- 勾列独立：默认白底；同Version绿底；armed/操作色都不得覆盖。 -->
+            <!-- 勾列独立：默认白底；同版本绿底；armed/操作色都不得覆盖。 -->
             <Setter Property="Background" Value="#FFFFFFFF" />
             <Setter Property="Foreground" Value="#FF000000" />
             <Style.Triggers>
@@ -217,14 +244,14 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-        <!-- Icon列（2026-11-02 用户定）：**默认白底**；只有组行按成员聚合Status整格染色
+        <!-- 图标列（2026-11-02 用户定）：**默认白底**；只有组行按成员聚合状态整格染色
              （黄=在队列 / 红=失败 / 绿=安装成功，放在「N 个」那一格），个数照常显示、文字 #4A4A4A。 -->
         <Style x:Key="LibraryIconCellStyle" TargetType="DataGridCell" BasedOn="{StaticResource LibraryCellStyleNoSeparator}">
-            <!-- 文件行白底；组行背景由 GroupIconBrush 给出（只按匹配已安装Version成员聚合）。 -->
+            <!-- 文件行白底；组行背景由 GroupIconBrush 给出（只按匹配已安装版本成员聚合）。 -->
             <Setter Property="Background" Value="{Binding GroupIconBrush}" />
         </Style>
-        <!-- Icon列模板（2026-11-01）：文件行显示Icon（尺寸=行高、居中、正方形）；组行显示个数。
-             底色由 LibraryIconCellStyle 负责（2026-11-02：默认白，组行按Status整格染色）。 -->
+        <!-- 图标列模板（2026-11-01）：文件行显示图标（尺寸=行高、居中、正方形）；组行显示个数。
+             底色由 LibraryIconCellStyle 负责（2026-11-02：默认白，组行按状态整格染色）。 -->
         <DataTemplate x:Key="IconCellTemplate">
             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Image Source="{Binding Icon}" Stretch="Uniform"
@@ -241,8 +268,8 @@
                         </Style>
                     </Image.Style>
                 </Image>
-                <!-- 组行：组内个数（2026-11-01：从Name列拆出来放Icon列）；
-                     2026-11-02 用户定：组行Icon列整格染色时「N 个」文字**略微加深**（#4A4A4A，不用纯黑） -->
+                <!-- 组行：组内个数（2026-11-01：从名称列拆出来放图标列）；
+                     2026-11-02 用户定：组行图标列整格染色时「N 个」文字**略微加深**（#4A4A4A，不用纯黑） -->
                 <TextBlock Text="{Binding GroupText}" FontSize="11" Foreground="#FF4A4A4A"
                            HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock.Style>
@@ -261,7 +288,7 @@
 
         <!-- ✓ 列模板（2026-11-02 用户定）：文件行只显示勾；**组行 = 勾在上、展开三角在下（两行同时显示）**。
              勾 11 DIP、三角 9 DIP（三角改更大的字形 ▶/▼ 抵消字号变小）；`◐` 已废弃。
-             勾 = 设备上装着「同 BundleId + 同Version」；组行 = 任一成员已装（LibraryInstalledStates）。 -->
+             勾 = 设备上装着「同 BundleId + 同版本」；组行 = 任一成员已装（LibraryInstalledStates）。 -->
         <DataTemplate x:Key="InstalledCellTemplate">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <!-- 勾（文件行：已装；组行：任一成员已装） -->
@@ -274,7 +301,7 @@
                                 <DataTrigger Binding="{Binding InstalledState}" Value="Yes">
                                     <Setter Property="Visibility" Value="Visible" />
                                 </DataTrigger>
-                                <!-- 2026-11-06：其他Version也显示 ✓；绿色只由同Version勾列底色表达。 -->
+                                <!-- 2026-11-06：其他版本也显示 ✓；绿色只由同版本勾列底色表达。 -->
                                 <DataTrigger Binding="{Binding InstalledState}" Value="OtherVersion">
                                     <Setter Property="Visibility" Value="Visible" />
                                 </DataTrigger>
@@ -307,7 +334,7 @@
             <!-- 2026-11-01 用户定：队列行高 24 DIP、垂直居中、选中灰底黑字 -->
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Foreground" Value="#FF000000" />
-            <Setter Property="Height" Value="24" />
+            <Setter Property="Height" Value="30" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Padding" Value="4,0" />
             <Setter Property="Background" Value="{Binding RowBrush}" />
@@ -326,7 +353,7 @@
                     ToolTip="Add a scan root or add IPA files">
                 <Button.ContextMenu>
                     <ContextMenu>
-                        <MenuItem Header="Add folder..." Click="OnAddRootClick"
+                        <MenuItem Header="Add folder…" Click="OnAddRootClick"
                                   ToolTip="Add an entire folder as a scan root" />
                         <MenuItem Header="Add files..." Command="{Binding AddIpaCommand}"
                                   ToolTip="Add only the selected IPA files" />
@@ -338,7 +365,7 @@
             <Button x:Name="LogToggleButton" Content="Hide log" Click="OnToggleLogClick"
                     Padding="12,4" Margin="8,0,0,0"
                     ToolTip="Show / hide the log pane on the right (Ctrl+L)" />
-            <!-- Settings入口（2026-11-02 用户定：工具条最右，独立窗口） -->
+            <!-- 设置入口（2026-11-02 用户定：工具条最右，独立窗口） -->
             <Button x:Name="SettingsButton" Content="Settings" Click="OnOpenSettingsClick"
                     Padding="12,4" Margin="8,0,0,0"
                     ToolTip="Settings: library / scan / icons / log / layout / devices" />
@@ -388,7 +415,7 @@
                        Text="{Binding SelectedDevice.Device.InfoLine}" />
         </StackPanel>
 
-        <!-- 设备行（M4-b4）：最左「Refresh」+ TabControl 切换条（每台在线设备一个 TabItem） -->
+        <!-- 设备行（M4-b4）：最左「刷新」+ TabControl 切换条（每台在线设备一个 TabItem） -->
         <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -428,7 +455,7 @@
                 <TabControl.ItemTemplate>
                     <DataTemplate>
                         <!-- 设备页签（2026-11-06 定稿）：
-                             最左固定当前Status块（不叠文字）；后面是每任务一块的进度条；文字直接叠在进度条上。
+                             最左固定当前状态块（不叠文字）；后面是每任务一块的进度条；文字直接叠在进度条上。
                              不再使用半透明百分比遮罩。 -->
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -494,7 +521,7 @@
             </TextBlock.Style>
         </TextBlock>
 
-        <!-- M4-b1 三栏：左 Library / 中 当前设备队列 / 右 Log（可隐藏，Ctrl+L） -->
+        <!-- M4-b1 三栏：左 资料库 / 中 当前设备队列 / 右 日志（可隐藏，Ctrl+L） -->
         <Grid x:Name="WorkspaceGrid">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="LeftColumn" Width="45*" MinWidth="360" />
@@ -506,11 +533,11 @@
 
             <GroupBox Grid.Column="0" Padding="4" Margin="0,0,0,0">
                 <DockPanel>
-                    <!-- 2026-11-07 用户定：所有Library操作集中到一条 WrapPanel，宽屏一行、窄屏自动换行 -->
+                    <!-- 2026-11-07 用户定：所有资料库操作集中到一条 WrapPanel，宽屏一行、窄屏自动换行 -->
                     <WrapPanel x:Name="LibraryToolbar" DockPanel.Dock="Top" Orientation="Horizontal"
                                Margin="0,0,0,4" HorizontalAlignment="Stretch"
                                TextElement.FontSize="11" TextElement.FontFamily="Microsoft YaHei UI">
-                        <!-- 2026-11-07 用户定：Library固定最左，Device apps切换紧随其后；
+                        <!-- 2026-11-07 用户定：资料库固定最左，设备应用切换紧随其后；
                              两个键用 SharedSizeGroup 按最长文字自动等宽，切换时位置不变。 -->
                         <Grid Grid.IsSharedSizeScope="True" Margin="0,0,6,2" VerticalAlignment="Center">
                             <Grid.ColumnDefinitions>
@@ -634,6 +661,30 @@
                                    VerticalAlignment="Center" Foreground="#FF666666"
                                    Text="{Binding LibraryCountText}" />
                     </WrapPanel>
+                    <!-- 设备应用页独立工具栏：不占用资料库的工具条；多选/批量卸载只作用于当前设备。 -->
+                    <WrapPanel x:Name="DeviceAppsToolbar" DockPanel.Dock="Top" Orientation="Horizontal"
+                               Margin="0,0,0,4" Visibility="Collapsed"
+                               TextElement.FontSize="11" TextElement.FontFamily="Microsoft YaHei UI">
+                        <Button x:Name="DeviceAppsMultiSelectButton"
+                                Content="{Binding DeviceAppsMultiSelectButtonText}"
+                                FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
+                                VerticalAlignment="Center"
+                                Click="OnToggleDeviceAppsMultiSelectClick"
+                                ToolTip="Device apps multi-select: click a row to select/deselect, then batch uninstall" />
+                        <Button x:Name="DeviceAppsBatchUninstallButton"
+                                Content="{Binding DeviceAppsBatchUninstallText}"
+                                FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
+                                VerticalAlignment="Center"
+                                IsEnabled="{Binding HasSelectedDeviceApps}"
+                                Click="OnUninstallSelectedDeviceAppsClick"
+                                ToolTip="Uninstall all selected device apps" />
+                        <Button Content="Select all" FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
+                                VerticalAlignment="Center" Click="OnSelectAllDeviceAppsClick" />
+                        <Button Content="Clear selection" FontSize="11" Height="20" Padding="8,0" Margin="0,0,4,2"
+                                VerticalAlignment="Center" Click="OnClearDeviceAppsSelectionClick" />
+                        <TextBlock Text="{Binding DeviceAppsCountText}" FontSize="11" Margin="2,0,0,2"
+                                   VerticalAlignment="Center" Foreground="#FF666666" />
+                    </WrapPanel>
                     <Grid>
                     <DataGrid x:Name="LibraryGrid"
                               IsEnabled="{Binding IsLibraryInteractive}"
@@ -657,6 +708,10 @@
                               ScrollViewer.HorizontalScrollBarVisibility="Auto">
                         <DataGrid.ContextMenu>
                             <ContextMenu x:Name="SingleLibraryContextMenu">
+                                <MenuItem x:Name="SingleForceInstallMenu"
+                                          Header="Force install to current device (skip minimum iOS and space checks)"
+                                          Click="OnForceInstallClick" />
+                                <Separator />
                                 <MenuItem Header="Copy BundleID" Click="OnCopyBundleId" />
                                 <MenuItem Header="Copy name" Click="OnCopyName" />
                                 <MenuItem Header="Copy version" Click="OnCopyVersion" />
@@ -670,8 +725,8 @@
                                 <MenuItem Header="Copy entire row (tab-separated)" Click="OnCopyRow" />
                                 <Separator />
                                 <MenuItem x:Name="SingleJoinGroupMenu" Header="Add to group" />
-                                <MenuItem x:Name="SingleNewGroupMenu" Header="New group..." Click="OnNewGroupClick" />
-                                <MenuItem x:Name="SingleManageGroupsMenu" Header="Manage groups..." Click="OnManageGroupsClick" />
+                                <MenuItem x:Name="SingleNewGroupMenu" Header="New group…" Click="OnNewGroupClick" />
+                                <MenuItem x:Name="SingleManageGroupsMenu" Header="Manage groups…" Click="OnManageGroupsClick" />
                                 <MenuItem x:Name="SingleRemoveGroupMenu" Header="Remove from current group"
                                           Click="OnRemoveFromGroupClick" />
                                 <Separator />
@@ -694,9 +749,12 @@
                               VirtualizingPanel.VirtualizationMode="Recycling"
                               RowStyle="{StaticResource DeviceAppRowStyle}"
                               CellStyle="{StaticResource DeviceAppCellStyle}"
-                              PreviewMouseLeftButtonDown="OnDeviceAppsPreviewMouseLeftButtonDown">
+                              PreviewMouseLeftButtonDown="OnDeviceAppsPreviewMouseLeftButtonDown"
+                              PreviewMouseMove="OnDeviceAppsPreviewMouseMove"
+                              PreviewMouseLeftButtonUp="OnDeviceAppsPreviewMouseLeftButtonUp"
+                              PreviewMouseRightButtonDown="OnDeviceAppsPreviewMouseRightButtonDown">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="Icon" Width="40" CanUserSort="False">
+                            <DataGridTemplateColumn Header="Icons" Width="40" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Image Source="{Binding Icon}" Width="28" Height="28"
@@ -704,9 +762,33 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
-                            <DataGridTextColumn Header="Version" Binding="{Binding VersionText}" Width="90" />
-                            <DataGridTextColumn Header="BundleId" Binding="{Binding BundleId}" Width="220" />
+                            <DataGridTemplateColumn Header="Name" Width="*" SortMemberPath="Name">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}"
+                                                   Style="{StaticResource DeviceAppTextStyle}"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Version" Width="90" SortMemberPath="VersionText">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding VersionText}"
+                                                   Style="{StaticResource DeviceAppTextStyle}"
+                                                   VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="BundleId" Width="220" SortMemberPath="BundleId">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding BundleId}"
+                                                   Style="{StaticResource DeviceAppTextStyle}"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                     <!-- 扫描期间占位：不逐批 Build，扫描结束一次性显示（2026-11-08 用户定） -->
@@ -736,7 +818,7 @@
                                 ToolTip="Suspend: let the current task finish; pending tasks are suspended. Resume: resume paused, suspended, or offline queues." />
                         <Button Content="Cancel" Command="{Binding SelectedDevice.CancelSelectedCommand}" Padding="10,2" Margin="6,0,0,0"
                                 ToolTip="Depends on the selected jobs state: running jobs end their process or uninstall later automatically; queued/suspended jobs are cancelled immediately" />
-                        <!-- Clear（2026-11-02 用户定）：原Library ⟳ 搬到这里，文案「Clear」；只作用于当前设备 -->
+                        <!-- 清除（2026-11-02 用户定）：原资料库 ⟳ 搬到这里，文案「清除」；只作用于当前设备 -->
                         <Button x:Name="ClearQueueButton" Content="Clear" Click="OnClearMarksClick"
                                 Padding="10,2" Margin="6,0,0,0"
                                 ToolTip="Clears finished jobs from the current device queue and removes their state markers" />

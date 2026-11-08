@@ -1,19 +1,19 @@
-﻿<Window x:Class="IdeviceGui.Views.GroupManagerWindow"
-        x:ClassModifier="internal"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Manage groups" Icon="/app.ico" Width="360" Height="360"
-        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
-        ShowInTaskbar="False">
-    <DockPanel Margin="12">
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
-                    HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button Content="Rename" Width="82" Padding="0,3" Click="OnRenameClick" />
-            <Button Content="Delete" Width="82" Padding="0,3" Margin="8,0,0,0" Click="OnDeleteClick" />
-            <Button Content="Close" Width="82" Padding="0,3" Margin="8,0,0,0"
-                    IsCancel="True" Click="OnCloseClick" />
-        </StackPanel>
-        <ListBox x:Name="GroupsList" ItemsSource="{Binding Groups}"
-                 BorderBrush="#FFC8C8C8" BorderThickness="1" />
-    </DockPanel>
-</Window>
+<Window x:Class="IdeviceGui.Views.GroupManagerWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Manage groups" Width="360" Height="360"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        ShowInTaskbar="False" Icon="/app.ico">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Rename" Width="82" Padding="0,3" Click="OnRenameClick" />
+            <Button Content="Delete" Width="82" Padding="0,3" Margin="8,0,0,0" Click="OnDeleteClick" />
+            <Button Content="Close" Width="82" Padding="0,3" Margin="8,0,0,0"
+                    IsCancel="True" Click="OnCloseClick" />
+        </StackPanel>
+        <ListBox x:Name="GroupsList" ItemsSource="{Binding Groups}"
+                 BorderBrush="#FFC8C8C8" BorderThickness="1" />
+    </DockPanel>
+</Window>

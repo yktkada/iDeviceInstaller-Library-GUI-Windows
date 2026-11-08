@@ -220,7 +220,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Windows 命令行引号（审查 B4）：**尾随反斜杠要成对翻倍**，否则 `--root "C:\path with spaces\"` 会把结尾引号吃掉。
+    /// Windows 命令行引号（审查 B4）：**尾随反斜杠要成对翻倍**，否则 `--root "C:\a b\"` 会把结尾引号吃掉。
     /// 规则（CommandLineToArgvW）：引号前的 N 个反斜杠 → 2N 个；字符串结尾的 N 个反斜杠 → 2N 个再加引号。
     /// </summary>
     private static string QuoteArg(string arg)

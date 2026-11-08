@@ -114,7 +114,7 @@ internal sealed class ProcessRunResult
 /// </para>
 /// <para>
 /// 超时与取消都会 <c>Kill(entireProcessTree: true)</c> 后返回 <see cref="ProcessRunResult"/>，不抛异常；
-/// 调用方负责把"超时"翻译成业务结果、把"取消"翻译成 <see cref="OperationCanceledException"/>。
+/// 调用方负责把"超时"翻译成业务结果、把"Cancel"翻译成 <see cref="OperationCanceledException"/>。
 /// <see cref="KillAll"/> 是关窗兜底：保证主程序退出时没有残留的 ideviceinstaller / AfcHelper。
 /// </para>
 /// <para>线程安全：可在任意线程并发调用；每个进程独立看门狗，不设全局锁（硬约束 #3）。</para>

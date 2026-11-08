@@ -7,7 +7,7 @@ using IdeviceGui.ViewModels.Library;
 namespace IdeviceGui.Views;
 
 /// <summary>
-/// Advanced filter窗口（2026-11-05）：组内 AND/OR、组间 AND、同一列不能重复；
+/// 高级筛选窗口（2026-11-05）：组内 AND/OR、组间 AND、同一列不能重复；
 /// 条件持久化由 MainViewModel 负责，本窗口只在「应用」时回传草稿。
 /// </summary>
 internal partial class AdvancedFilterWindow : Window

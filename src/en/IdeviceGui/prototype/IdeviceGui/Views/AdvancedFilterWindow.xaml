@@ -1,9 +1,9 @@
-﻿<Window x:Class="IdeviceGui.Views.AdvancedFilterWindow" x:ClassModifier="internal"
+<Window x:Class="IdeviceGui.Views.AdvancedFilterWindow" x:ClassModifier="internal"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Advanced filter" Icon="/app.ico" Width="780" Height="640" MinWidth="620" MinHeight="480"
+        Title="Advanced filter" Width="780" Height="640" MinWidth="620" MinHeight="480"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        AutomationProperties.AutomationId="AdvancedFilterWindow">
+        AutomationProperties.AutomationId="AdvancedFilterWindow" Icon="/app.ico">
     <DockPanel Margin="10">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
             <TextBlock Text="Within a group use AND / OR; groups are always combined with AND. Each column can only be selected once." VerticalAlignment="Center" Foreground="#FF666666" />

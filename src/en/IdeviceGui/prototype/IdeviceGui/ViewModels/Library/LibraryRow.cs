@@ -16,11 +16,11 @@ internal enum CompatState
     /// <summary>已判定可安装。</summary>
     Compatible,
 
-    /// <summary>已判定Not installable（硬冲突）。界面整格红底。</summary>
+    /// <summary>已判定不可安装（硬冲突）。界面整格红底。</summary>
     Conflict,
 }
 
-/// <summary>Not installable的具体依据（M5 填充；现在恒为 null）。</summary>
+/// <summary>不可安装的具体依据（M5 填充；现在恒为 null）。</summary>
 internal sealed record CompatConflict(string Reason);
 
 /// <summary>
@@ -30,7 +30,7 @@ internal sealed record CompatConflict(string Reason);
 /// 不重建集合（硬约束 #8）、不丢选中与滚动位置。
 /// </para>
 /// </summary>
-internal sealed class LibraryRow : ObservableObject
+internal sealed class LibraryRow : ObservableObject, IMultiSelectRow
 {
     private long _appSize;
     private long _fileSize;

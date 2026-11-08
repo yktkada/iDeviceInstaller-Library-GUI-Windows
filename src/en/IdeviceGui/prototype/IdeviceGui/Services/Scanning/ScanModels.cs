@@ -80,7 +80,7 @@ internal sealed class ScanResult
     /// 否则库里不可写会显示成"扫描完成：文件 0"（审核 P1-1）。
     /// </summary>
     public string Summary => Error is { Length: > 0 }
-        ? "Scan skipped: " + Error
+        ? "Skipping scan: " + Error
         : $"Scan complete: files {TotalFiles}; added {Added}, moved {Moved}, replaced {Replaced}, size/time only {Touched}, " +
           $"marked missing {Missing}, identity flips {IdentityFlips}, unchanged {Unchanged}; " +
           $"parsed {Parsed} (ok {ParseOk} / failed {ParseFailed}); " +

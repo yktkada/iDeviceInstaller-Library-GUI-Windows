@@ -7,7 +7,7 @@ namespace IdeviceGui.Services;
 /// 回读实现：`ideviceinstaller -u &lt;udid&gt; list --xml` → plist 数组 → BundleId + 版本。
 /// <para>
 /// 版本口径（总览 §6.10 实测）：**优先 `CFBundleShortVersionString`，缺失/为空时回退 `CFBundleVersion`**；
-/// 两者都取不到时标记"版本未知"（<see cref="InstalledApp.VersionKnown"/> = false），
+/// 两者都取不到时标记"Version unknown"（<see cref="InstalledApp.VersionKnown"/> = false），
 /// 调用方只按 BundleId 判定，不得推测版本。
 /// </para>
 /// <para>

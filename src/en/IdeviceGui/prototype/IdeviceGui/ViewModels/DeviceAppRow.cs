@@ -5,11 +5,12 @@ using IdeviceGui.ViewModels.Library;
 namespace IdeviceGui.ViewModels;
 
 /// <summary>设备应用列表的一行（只读回读快照；不含系统 App）。</summary>
-internal sealed class DeviceAppRow : ObservableObject
+internal sealed class DeviceAppRow : ObservableObject, IMultiSelectRow
 {
     private object? _icon;
     private LibraryMarker _marker;
     private bool _isArmed;
+    private bool _isMultiSelected;
     private OperationVisual _visual;
 
     public required string BundleId { get; init; }
@@ -48,6 +49,13 @@ internal sealed class DeviceAppRow : ObservableObject
     {
         get => _isArmed;
         set => SetProperty(ref _isArmed, value);
+    }
+
+    /// <summary>设备应用多选：只改变行视觉，批量卸载读取这个标记。</summary>
+    public bool IsMultiSelected
+    {
+        get => _isMultiSelected;
+        set => SetProperty(ref _isMultiSelected, value);
     }
 
     // LibraryRowStyle 的组行绑定契约；设备应用没有组状态。

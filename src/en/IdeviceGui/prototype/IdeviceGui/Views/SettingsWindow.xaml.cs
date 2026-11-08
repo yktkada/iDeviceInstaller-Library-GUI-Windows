@@ -11,7 +11,7 @@ using Microsoft.Win32;
 namespace IdeviceGui.Views;
 
 /// <summary>
-/// Settings窗口（2026-11-02 用户定，docs/01 §2.4）：六个Settings分组，每组一个「恢复默认」，另有只读英文「关于」页；
+/// 设置窗口（2026-11-02 用户定，docs/01 §2.4）：六个设置分组，每组一个「恢复默认」，另有只读英文「关于」页；
 /// **窗口内即时预览，点「确定 / 应用」才写库**；「取消 / 关窗」回滚到打开窗口时的值。
 /// </summary>
 internal partial class SettingsWindow : Window
@@ -48,6 +48,7 @@ internal partial class SettingsWindow : Window
     };
 
     private readonly ObservableCollection<FieldItem> _fields = new();
+    private readonly ObservableCollection<QueueFieldItem> _queueFields = new();
     private readonly List<(SearchField Field, System.Windows.Controls.CheckBox Box)> _scopeBoxes = new();
     private readonly Dictionary<string, bool> _initialColumnVisibility = new(StringComparer.Ordinal);
     private readonly List<(string Key, System.Windows.Controls.CheckBox Box)> _columnBoxes = new();
@@ -224,6 +225,11 @@ internal partial class SettingsWindow : Window
             foreach (var setting in _draft.DeviceFields.OrderBy(f => f.Order))
                 _fields.Add(new FieldItem(setting.Field, setting.Visible));
             FieldsList.ItemsSource = _fields;
+
+            _queueFields.Clear();
+            foreach (var setting in _draft.QueueColumns.OrderBy(f => f.Order))
+                _queueFields.Add(new QueueFieldItem(setting.Column, setting.Visible));
+            QueueFieldsList.ItemsSource = _queueFields;
         }
         finally
         {
@@ -274,6 +280,9 @@ internal partial class SettingsWindow : Window
         _draft.DeviceFields = _fields
             .Select((item, index) => new DeviceInfoFieldSetting(item.Field, item.Visible, index))
             .ToList();
+        _draft.QueueColumns = _queueFields
+            .Select((item, index) => new QueueColumnSetting(item.Column, item.Visible, index))
+            .ToList();
     }
 
     private static int ParseInt(string? raw, int fallback, int min, int max)
@@ -304,7 +313,7 @@ internal partial class SettingsWindow : Window
 
     // ── 事件 ────────────────────────────────────────────────────────────────
 
-    /// <summary>行高滑杆：先把值同步到输入框，再走统一的"改草稿"路径（输入框是唯一事实Source）。</summary>
+    /// <summary>行高滑杆：先把值同步到输入框，再走统一的"改草稿"路径（输入框是唯一事实来源）。</summary>
     private void OnRowHeightSliderChanged(object sender, RoutedEventArgs e)
     {
         if (_loading || _closed) return;
@@ -318,7 +327,7 @@ internal partial class SettingsWindow : Window
 
     private void OnFieldCheckChanged(object sender, RoutedEventArgs e) => Changed();
 
-    /// <summary>任何Settings改动：读草稿 + 置 dirty + 300 ms 防抖后预览（审查 N8：文本框每键重建扫描器太浪费）。</summary>
+    /// <summary>任何设置改动：读草稿 + 置 dirty + 300 ms 防抖后预览（审查 N8：文本框每键重建扫描器太浪费）。</summary>
     private void Changed()
     {
         if (_loading || _closed) return;
@@ -374,7 +383,7 @@ internal partial class SettingsWindow : Window
 
             var (ok, error) = await _vm.AddScanRootAsync(dialog.FolderName);
 
-            // 审查 N4：await 期间用户可能已关窗 → 只写日志/Status栏，不再弹 MessageBox / 碰控件
+            // 审查 N4：await 期间用户可能已关窗 → 只写日志/状态栏，不再弹 MessageBox / 碰控件
             if (_closed) return;
             if (!ok)
             {
@@ -421,6 +430,26 @@ internal partial class SettingsWindow : Window
         var item = _fields[index];
         _fields.Move(index, target);
         FieldsList.SelectedIndex = target;
+        ReadControlsToDraft();
+        _dirty = true;
+        SchedulePreview();
+    }
+
+    private void OnQueueFieldCheckChanged(object sender, RoutedEventArgs e) => Changed();
+
+    private void OnQueueFieldUpClick(object sender, RoutedEventArgs e) => MoveQueueField(-1);
+
+    private void OnQueueFieldDownClick(object sender, RoutedEventArgs e) => MoveQueueField(1);
+
+    private void MoveQueueField(int delta)
+    {
+        var index = QueueFieldsList.SelectedIndex;
+        var target = index + delta;
+        if (index < 0 || target < 0 || target >= _queueFields.Count) return;
+
+        var item = _queueFields[index];
+        _queueFields.Move(index, target);
+        QueueFieldsList.SelectedIndex = target;
         ReadControlsToDraft();
         _dirty = true;
         SchedulePreview();
@@ -522,6 +551,26 @@ internal partial class SettingsWindow : Window
             DeviceInfoField.Ecid => "ECID",
             _ => Field.ToString(),
         };
+
+        public bool Visible
+        {
+            get => _visible;
+            set => SetProperty(ref _visible, value);
+        }
+    }
+
+    private sealed class QueueFieldItem : ObservableObject
+    {
+        private bool _visible;
+
+        public QueueFieldItem(QueueColumn column, bool visible)
+        {
+            Column = column;
+            _visible = visible;
+        }
+
+        public QueueColumn Column { get; }
+        public string Name => QueueColumns.Header(Column);
 
         public bool Visible
         {

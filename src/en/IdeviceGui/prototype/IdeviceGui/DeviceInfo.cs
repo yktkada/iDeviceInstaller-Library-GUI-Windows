@@ -216,9 +216,9 @@ internal sealed class DeviceInfo : ObservableObject
             ? value.ToString("X16", CultureInfo.InvariantCulture)
             : "";
 
-    public string EcidHexMenuText => "ECID (hex): " + (EcidHex.Length > 0 ? EcidHex : "—");
+    public string EcidHexMenuText => "ECID(hex)：" + (EcidHex.Length > 0 ? EcidHex : "—");
 
-    public string EcidDecimalMenuText => "ECID (dec): " + (_ecid.Length > 0 ? _ecid : "—");
+    public string EcidDecimalMenuText => "ECID(dec)：" + (_ecid.Length > 0 ? _ecid : "—");
 
     public string SerialMenuText => "Serial number: " + (_serial.Length > 0 ? _serial : "—");
 

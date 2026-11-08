@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using IdeviceGui.Services;
@@ -34,7 +34,7 @@ internal sealed class CliRunner : ICliRunner
     /// </summary>
     private static readonly TimeSpan OperationIdleTimeout = TimeSpan.FromSeconds(180);
 
-    /// <summary>回读 `list --xml` 超时（07 §3.3：30 s；超时 = 结果未知，标"需确认"）。</summary>
+    /// <summary>回读 `list --xml` 超时（07 §3.3：30 s；超时 = 结果未知，标"Needs confirmation"）。</summary>
     private static readonly TimeSpan ReadbackTimeout = TimeSpan.FromSeconds(30);
 
     public string ToolkitDir { get; }
@@ -395,7 +395,7 @@ internal sealed class CliRunner : ICliRunner
             ct.ThrowIfCancellationRequested();
         }
 
-        // 超时 / 启动失败 / 退出码非 0 → 结果未知，由 ReadbackService 标"需确认"（07 §3.3）
+        // 超时 / 启动失败 / 退出码非 0 → 结果未知，由 ReadbackService 标"Needs confirmation"（07 §3.3）
         if (!result.Started || result.TimedOut || result.ExitCode != 0)
         {
             return null;
@@ -522,6 +522,7 @@ internal sealed class CliRunner : ICliRunner
 
     /// <summary>
     /// 查找顺序（10 §3.1）：程序目录 → 程序目录\toolkit。
+    /// 最后一项是开发机兜底，**只在 DEBUG 生效**（Release 发布版不认开发机绝对路径）。
     /// </summary>
     private static string ResolveToolkitDir()
     {
@@ -530,8 +531,6 @@ internal sealed class CliRunner : ICliRunner
             AppContext.BaseDirectory,
             Path.Combine(AppContext.BaseDirectory, "toolkit"),
         };
-
-
 
         foreach (var dir in candidates)
         {

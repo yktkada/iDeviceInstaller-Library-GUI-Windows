@@ -934,8 +934,8 @@ internal sealed class LibraryView
         return min == max ? min : min + "–" + max;
     }
 
-    /// <summary>组行里"所有成员都相同"的字段才显示值，否则显示"Mixed"。</summary>
-    /// <summary>组内来源全相同才显示；混合来源不显示（用户只要三类标签，不引入“Mixed”）。</summary>
+    /// <summary>组行里"所有成员都相同"的字段才显示值，否则显示"Multiple"。</summary>
+    /// <summary>组内来源全相同才显示；混合来源不显示（用户只要三类标签，不引入“多种”）。</summary>
     private static string CommonOrigin(IEnumerable<string> values)
     {
         var list = values.Where(v => !string.IsNullOrEmpty(v)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -954,7 +954,7 @@ internal sealed class LibraryView
         {
             0 => "",
             1 => list[0],
-            _ => "Mixed",
+            _ => "Multiple",
         };
     }
 }

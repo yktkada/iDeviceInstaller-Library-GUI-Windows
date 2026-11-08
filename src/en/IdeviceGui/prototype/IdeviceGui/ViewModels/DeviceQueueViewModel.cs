@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using IdeviceGui.Services;
 
 namespace IdeviceGui.ViewModels;
@@ -73,6 +73,15 @@ internal sealed class DeviceQueueViewModel : ObservableObject
 
     public DeviceInfo Device { get; }
     public ObservableCollection<JobViewModel> Jobs { get; } = new();
+
+    private IReadOnlyList<QueueColumn> _queueColumns = QueueColumns.OrderedVisible(QueueColumns.Default);
+
+    /// <summary>设置面板改队列列顺序/可见性后，把这个设备的现有行一起刷新。</summary>
+    public void ApplyQueueColumns(IReadOnlyList<QueueColumn> columns)
+    {
+        _queueColumns = columns;
+        foreach (var job in Jobs) job.DisplayColumns = columns;
+    }
 
     public AsyncRelayCommand SuspendCommand { get; }
     public AsyncRelayCommand ResumeCommand { get; }
@@ -245,7 +254,7 @@ internal sealed class DeviceQueueViewModel : ObservableObject
             return existing;
         }
 
-        var vm = new JobViewModel(item, Device.ShortName);
+        var vm = new JobViewModel(item, Device.ShortName) { DisplayColumns = _queueColumns };
         Jobs.Add(vm);
         RecomputeProgress();
         return vm;

@@ -8,32 +8,32 @@ namespace IdeviceGui.ViewModels.Library;
 /// <summary>网格列描述（docs/06 §3.1）：`Key` 是**稳定标识**，不存"第几列"，加列/删列时旧配置仍能对上。</summary>
 internal sealed record ColumnSpec(string Key, string Header, double DefaultWidth, double MinWidth = 60);
 
-/// <summary>一列的持久化State：显示顺序 = 数组顺序（docs/09 §3.2 `Grid.Columns`）。</summary>
+/// <summary>一列的持久化状态：显示顺序 = 数组顺序（docs/09 §3.2 `Grid.Columns`）。</summary>
 internal sealed record GridColumnState(string Key, double Width, bool Visible);
 
 /// <summary>
-/// 从界面抓列State时的中间结构：WPF 用户拖动换序只改 <c>DataGridColumn.DisplayIndex</c>，
+/// 从界面抓列状态时的中间结构：WPF 用户拖动换序只改 <c>DataGridColumn.DisplayIndex</c>，
 /// **不改 <c>Columns</c> 集合顺序**，所以保存必须按 DisplayIndex 排（审核 P2-4）。
 /// </summary>
 internal readonly record struct GridColumnEntry(string Key, int DisplayIndex, double Width, bool Visible);
 
 /// <summary>
 /// 10 列的定义与 `Grid.Columns` 的读写（docs/06 §2/§3.1）。
-/// 默认顺序（2026-10-31 用户拍板）：Icon · Name · Uncompressed size· Version · 最低 iOS · Device family · BundleId · Architecture · Original size · State（最后）。
+/// 默认顺序（2026-10-31 用户拍板）：图标 · 名称 · 解压后体积· 版本 · 最低 iOS · 设备族 · BundleId · 架构 · 原始大小 · 状态（最后）。
 /// <para>
-/// **列序Version（2026-11-01）**：老Version存下来的 `Grid.Columns` 是旧顺序（`name` 开头、`icon` 第 5、`state` 第 3），
-/// 直接读会让"Icon不是第一列、State不在最后"。用 `Grid.Columns.Version` 做一次迁移：旧配置**保留宽度/可见性**，
-/// 只把顺序重排成当前默认；迁移后写回Version号，之后用户自己拖的顺序不再被动。
+/// **列序版本（2026-11-01）**：老版本存下来的 `Grid.Columns` 是旧顺序（`name` 开头、`icon` 第 5、`state` 第 3），
+/// 直接读会让"图标不是第一列、状态不在最后"。用 `Grid.Columns.Version` 做一次迁移：旧配置**保留宽度/可见性**，
+/// 只把顺序重排成当前默认；迁移后写回版本号，之后用户自己拖的顺序不再被动。
 /// </para>
 /// </summary>
 internal static class LibraryColumns
 {
     public const string GridColumnsKey = "Grid.Columns";
 
-    /// <summary>列序Version：2 = Icon第一、State最后（2026-11-01 起）。老配置（无Version号）读到时会迁移一次。</summary>
+    /// <summary>列序版本：2 = 图标第一、状态最后（2026-11-01 起）。老配置（无版本号）读到时会迁移一次。</summary>
     public const string GridColumnsVersionKey = "Grid.Columns.Version";
 
-    public const int LayoutVersion = 7;   // 7 = 新增「Source」列（2026-11-05）；6 = Device family列加宽到 130（2026-11-04 M5-lite）；5 = 勾列宽度砍半（2026-11-02）；
+    public const int LayoutVersion = 7;   // 7 = 新增「来源」列（2026-11-05）；6 = 设备族列加宽到 130（2026-11-04 M5-lite）；5 = 勾列宽度砍半（2026-11-02）；
                                           // 2026-11-03 起迁移**不再重排列顺序**（审查 B1）
 
     /// <summary>已安装标记列（2026-11-01：最前、极窄、✓/空）。</summary>
@@ -51,10 +51,10 @@ internal static class LibraryColumns
     public const string FileSize = "fileSize";
     public const string State = "state";
 
-    /// <summary>File path列（2026-11-01：最后一列）。</summary>
+    /// <summary>文件路径列（2026-11-01：最后一列）。</summary>
     public const string FilePath = "filePath";
 
-    /// <summary>按界面显示顺序（DisplayIndex）产出要保存的列State；同下标时保持传入顺序。</summary>
+    /// <summary>按界面显示顺序（DisplayIndex）产出要保存的列状态；同下标时保持传入顺序。</summary>
     public static IReadOnlyList<GridColumnState> OrderForSave(IEnumerable<GridColumnEntry> entries) =>
         entries.OrderBy(entry => entry.DisplayIndex)
                .Select(entry => new GridColumnState(entry.Key, entry.Width, entry.Visible))
@@ -63,7 +63,7 @@ internal static class LibraryColumns
     public static IReadOnlyList<ColumnSpec> Defaults { get; } = new[]
     {
         new ColumnSpec(Installed, "✓", 13, 11),   // 2026-11-02 用户定：宽度砍半
-        new ColumnSpec(Icon, "Icon", 44, 40),
+        new ColumnSpec(Icon, "Icons", 44, 40),
         new ColumnSpec(Name, "Name", 170, 120),
         new ColumnSpec(Origin, "Source", 110, 90),
         new ColumnSpec(AppSize, "Uncompressed size", 132, 57),
@@ -73,7 +73,7 @@ internal static class LibraryColumns
         new ColumnSpec(BundleId, "BundleId", 150, 100),
         new ColumnSpec(Arch, "Architecture", 86, 70),
         new ColumnSpec(FileSize, "Original size", 84, 57),
-        new ColumnSpec(State, "State", 120, 80),
+        new ColumnSpec(State, "Status", 120, 80),
         new ColumnSpec(FilePath, "File path", 220, 120),
     };
 
@@ -100,9 +100,9 @@ internal static class LibraryColumns
 
     /// <summary>
     /// 读配置；库没打开 / 没写过 / 坏值 → 默认顺序与宽度。
-    /// 老Version配置（无Version号，或Version &lt; <see cref="LayoutVersion"/>）只做两件事：
-    /// **补上新增列**（按默认顺序插到合适位置）+ 按Version改个别列的宽度，
-    /// **绝不重排用户拖过的列顺序**（审查 B1，2026-11-03 修）；最后把Version号写回。
+    /// 老版本配置（无版本号，或版本 &lt; <see cref="LayoutVersion"/>）只做两件事：
+    /// **补上新增列**（按默认顺序插到合适位置）+ 按版本改个别列的宽度，
+    /// **绝不重排用户拖过的列顺序**（审查 B1，2026-11-03 修）；最后把版本号写回。
     /// </summary>
     public static IReadOnlyList<GridColumnState> Load(AppDatabase? db)
     {
@@ -114,12 +114,12 @@ internal static class LibraryColumns
 
             var states = ParseSaved(raw);   // 审查 B1：迁移要看"用户真实保存的顺序"，不能用 Parse 的"缺列补最后"
             var fromVersion = ReadVersion(db);
-            if (fromVersion >= LayoutVersion) return Parse(raw);   // 已是最新Version：保持原语义（缺列补最后）
+            if (fromVersion >= LayoutVersion) return Parse(raw);   // 已是最新版本：保持原语义（缺列补最后）
 
             // 审查 B1：不能整体重排（会把用户拖过的列顺序冲掉）；只补缺列、保留已存顺序
             var migrated = EnsureKnownColumns(states);
 
-            // v6：Device family列加宽到 130（M5-lite 显示串更长；只改这一列）
+            // v6：设备族列加宽到 130（M5-lite 显示串更长；只改这一列）
             if (fromVersion < 6)
             {
                 migrated = migrated
@@ -195,7 +195,7 @@ internal static class LibraryColumns
         return int.MaxValue;
     }
 
-    /// <summary>把一组列State按当前默认顺序重排（保留宽度/可见性；认不出的 key 丢弃）。</summary>
+    /// <summary>把一组列状态按当前默认顺序重排（保留宽度/可见性；认不出的 key 丢弃）。</summary>
     internal static IReadOnlyList<GridColumnState> CanonicalOrder(IReadOnlyList<GridColumnState> states)
     {
         var byKey = states
@@ -280,12 +280,12 @@ internal static class LibraryColumns
             if (string.IsNullOrEmpty(key)) continue;
             if (!seen.Add(key)) continue;
             var spec = Find(key);
-            if (spec is null) continue;                 // 认不出的列（旧Version/拼错）忽略
+            if (spec is null) continue;                 // 认不出的列（旧版本/拼错）忽略
             var width = double.IsNaN(item.width) || item.width <= 0 ? spec.DefaultWidth : item.width;
             result.Add(new GridColumnState(key, Math.Clamp(width, spec.MinWidth, 600), item.visible));
         }
 
-        // 缺的列按默认顺序补在最后（新Version加的列不会因为旧配置而消失）
+        // 缺的列按默认顺序补在最后（新版本加的列不会因为旧配置而消失）
         if (includeMissing)
         {
             foreach (var spec in Defaults)

@@ -33,11 +33,11 @@ internal enum QueueStatus
     Paused,
     Failed,
 
-    /// <summary>用户取消（2026-11-01）：未开始 / 上传中断 → Cancelled，不算Failed；Installing的取消走「装完自动卸载」。</summary>
+    /// <summary>用户取消（2026-11-01）：未开始 / 上传中断 → 已取消，不算失败；安装中的取消走「装完自动卸载」。</summary>
     Cancelled,
 
     /// <summary>
-    /// 回读结果Unknown（命令异常/超时，且设备仍在线）。
+    /// 回读结果未知（命令异常/超时，且设备仍在线）。
     /// **2026-11-07 起已不可达**：回读异常 3 次后直接 Failed；枚举保留以稳定状态编号与旧数据兼容。
     /// </summary>
     NeedsConfirm,
@@ -45,7 +45,7 @@ internal enum QueueStatus
     /// <summary>队列级软挂起（2026-11-07）：任务尚未开始，继续时直接回 Pending，不触发中断恢复回读。</summary>
     Suspended,
 
-    /// <summary>仅内存态：本次会话内保留的"Completed"显示，Completed不写库（07 §3.1）。</summary>
+    /// <summary>仅内存态：本次会话内保留的"Completed"显示，完成不写库（07 §3.1）。</summary>
     Done,
 }
 
@@ -120,7 +120,7 @@ internal readonly record struct DiskUsage(bool Ok, long TotalBytes, long FreeByt
 
 /// <summary>
 /// ideviceinstaller install 的结果。超时被杀是独立情况：
-/// 杀完必须再探测设备——离线则暂停队列，在线则记Failed继续（07 §3.3）。
+/// 杀完必须再探测设备——离线则暂停队列，在线则记失败继续（07 §3.3）。
 /// </summary>
 internal readonly record struct InstallOutcome(
     int ExitCode,
@@ -210,7 +210,7 @@ internal interface ICliRunner
     /// <summary>
     /// `ideviceinstaller -u &lt;udid&gt; list --xml`，返回**原始 XML 文本**（plist 数组），
     /// 解析交给 ReadbackService（保持可测、可脱离进程单测）。
-    /// 超时 30 s（07 §3.3：结果Unknown → 标"Needs confirmation"）；超时 / 启动Failed / 退出码非 0 → 返回 null。
+    /// 超时 30 s（07 §3.3：结果未知 → 标"Needs confirmation"）；超时 / 启动失败 / 退出码非 0 → 返回 null。
     /// </summary>
     Task<string?> ListInstalledXmlAsync(string udid, CancellationToken ct);
 }
@@ -221,7 +221,7 @@ internal interface ICliRunner
 /// </summary>
 internal interface IAfcHelper
 {
-    /// <summary>清空设备 /PublicStaging。清理Failed不阻断安装，只记警告（07 §3.2）。</summary>
+    /// <summary>清空设备 /PublicStaging。清理失败不阻断安装，只记警告（07 §3.2）。</summary>
     Task<AfcCleanOutcome> CleanStagingAsync(string udid, IProgress<string>? log, CancellationToken ct);
 
     /// <summary>读设备可用空间（AFC FSTotalBytes / FSFreeBytes），作为 ideviceinfo 的兜底（02 §3）。</summary>
@@ -253,7 +253,7 @@ internal static class InstalledAppSet
         return null;
     }
 
-    /// <summary>版本比较：任一侧Unknown则返回 null（调用方按"版本Unknown"处理，不判不一致）。</summary>
+    /// <summary>版本比较：任一侧未知则返回 null（调用方按"Version unknown"处理，不判不一致）。</summary>
     public static bool? VersionsMatch(InstalledApp installed, string? packageVersion)
     {
         if (!installed.VersionKnown || string.IsNullOrWhiteSpace(packageVersion)) return null;

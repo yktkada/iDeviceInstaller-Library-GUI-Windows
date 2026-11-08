@@ -44,7 +44,7 @@ public partial class MainWindow : Window
 
         _vm = new MainViewModel(cli, afc, PickIpaFiles, scanRootOverride, new DispatcherUiTimer());
         DataContext = _vm;
-        GroupFilterCombo.SelectedIndex = 0;   // 启动默认「All」
+        GroupFilterCombo.SelectedIndex = 0;   // 启动默认「全部」
         // 分组集合重建（扫描/管理）后 ComboBox 可能被清空到 null；恢复当前选择，避免启动/刷新后显示空白。
         _vm.GroupFilterOptions.CollectionChanged += (_, _) =>
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.DataBind, new Action(() =>
@@ -55,7 +55,7 @@ public partial class MainWindow : Window
                         _vm.ActiveGroupName);
             }));
 
-        // 行高可能被Settings窗口"预览"改动（不经 SetLibraryRowHeight），这里统一跟一下Icon列宽
+        // 行高可能被设置窗口"预览"改动（不经 SetLibraryRowHeight），这里统一跟一下图标列宽
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.LibraryRowHeight)) ApplyIconColumnWidth();
@@ -145,10 +145,10 @@ public partial class MainWindow : Window
 
     private void OnToggleLogClick(object sender, RoutedEventArgs e) => ToggleLog();
 
-    /// <summary>显示 / Hide log栏（工具条按钮与 Ctrl+L 共用；最大化时的叠加层在 M4-b3 接进来）。</summary>
+    /// <summary>显示 / 隐藏日志栏（工具条按钮与 Ctrl+L 共用；最大化时的叠加层在 M4-b3 接进来）。</summary>
     private void ToggleLog()
     {
-        var columns = CurrentColumns();          // 先把当前比例抓住，再切隐藏Status
+        var columns = CurrentColumns();          // 先把当前比例抓住，再切隐藏状态
         _logHidden = !_logHidden;
         _layout = _layout with { LogHidden = _logHidden, Columns = columns };
         ApplyColumns();
@@ -165,7 +165,7 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>双击分隔条恢复默认比例 45 / 27 / 28（隐藏Status不动）。</summary>
+    /// <summary>双击分隔条恢复默认比例 45 / 27 / 28（隐藏状态不动）。</summary>
     private void OnSplitterDoubleClick(object sender, MouseButtonEventArgs e)
     {
         _layout = _layout with { Columns = LayoutState.Default.Columns };
@@ -187,7 +187,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// 关窗前取消所有设备泵并杀子进程，确认没有残留 ideviceinstaller / AfcHelper 再退出。
     /// Closing 是同步签名，所以先取消关闭、await 清理、再真正关一次（_closing 防重入）。
-    /// 布局在关窗最前面存（此时库还活着）：用户拖过的比例、隐藏Status要带到下次启动。
+    /// 布局在关窗最前面存（此时库还活着）：用户拖过的比例、隐藏状态要带到下次启动。
     /// </summary>
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -255,7 +255,7 @@ public partial class MainWindow : Window
         SyncSortIndicatorsFromViewModel();
     }
 
-    /// <summary>Icon列宽 = 行高 + 左右边距（2026-11-01：保证Icon正方形并居中）。</summary>
+    /// <summary>图标列宽 = 行高 + 左右边距（2026-11-01：保证图标正方形并居中）。</summary>
     private void ApplyIconColumnWidth()
     {
         if (_vm is null) return;
@@ -312,9 +312,9 @@ public partial class MainWindow : Window
     }
 
     private DataGridColumn BuildIconColumn()
-        => BuildTemplateColumn(LibraryColumns.Icon, "Icon", "IconCellTemplate", cannotResize: true);
+        => BuildTemplateColumn(LibraryColumns.Icon, "Icons", "IconCellTemplate", cannotResize: true);
 
-    /// <summary>已Install ✓ 列（2026-11-01）：最前、极窄、只显示 ✓ / ◐ / 空（黑色、居中）。</summary>
+    /// <summary>已安装 ✓ 列（2026-11-01）：最前、极窄、只显示 ✓ / ◐ / 空（黑色、居中）。</summary>
     private DataGridColumn BuildInstalledColumn()
         => BuildTemplateColumn(LibraryColumns.Installed, "✓", "InstalledCellTemplate", cannotResize: false);
 
@@ -329,7 +329,7 @@ public partial class MainWindow : Window
             SortMemberPath = key,
         };
 
-        // 勾列：打勾 → 整格绿底（2026-11-02 第二轮）；Icon列：默认白 + 组行按Status染色；两列都不画竖线
+        // 勾列：打勾 → 整格绿底（2026-11-02 第二轮）；图标列：默认白 + 组行按状态染色；两列都不画竖线
         column.CellStyle = key switch
         {
             LibraryColumns.Installed => (Style)FindResource("LibraryInstalledCellStyle"),
@@ -339,7 +339,7 @@ public partial class MainWindow : Window
 
         if (cannotResize)
         {
-            // Icon列宽由行高自动决定（ApplyIconColumnWidth），不参与拖动
+            // 图标列宽由行高自动决定（ApplyIconColumnWidth），不参与拖动
             column.Width = new DataGridLength(38, DataGridLengthUnitType.Pixel);
             column.MinWidth = 22;
         }
@@ -347,7 +347,7 @@ public partial class MainWindow : Window
         return column;
     }
 
-    /// <summary>Status列：正常一行字；**兼容冲突时整格红底**（M5 才可能变红，接口已预留）。</summary>
+    /// <summary>状态列：正常一行字；**兼容冲突时整格红底**（M5 才可能变红，接口已预留）。</summary>
     private static DataGridColumn BuildStateColumn()
     {
         var border = new FrameworkElementFactory(typeof(Border));
@@ -437,6 +437,8 @@ public partial class MainWindow : Window
     {
         if (_vm is null) return;
         var isGroupRow = _contextRow?.IsGroup == true || SelectedLibraryRow?.IsGroup == true;
+        var hasFileRow = _contextRow is { IsGroup: false } || SelectedLibraryRow is { IsGroup: false };
+        SingleForceInstallMenu.Visibility = hasFileRow ? Visibility.Visible : Visibility.Collapsed;
         SingleJoinGroupMenu.Visibility = isGroupRow ? Visibility.Collapsed : Visibility.Visible;
         SingleNewGroupMenu.Visibility = isGroupRow ? Visibility.Collapsed : Visibility.Visible;
         SingleManageGroupsMenu.Visibility = isGroupRow ? Visibility.Collapsed : Visibility.Visible;
@@ -463,6 +465,13 @@ public partial class MainWindow : Window
     /// <summary>右键目标行：优先本次右键命中的行，其次当前选中行。</summary>
     private LibraryRow? ContextRow => _contextRow ?? SelectedLibraryRow;
 
+    private void OnForceInstallClick(object sender, RoutedEventArgs e)
+    {
+        var row = ContextRow;
+        if (row is null || row.IsGroup) return;
+        _vm?.ForceInstallToCurrentDevice(row);
+    }
+
     private void OnCopyBundleId(object sender, RoutedEventArgs e) => CopyToClipboard(LibraryCopy.BundleId(ContextRow), "BundleId");
     private void OnCopyName(object sender, RoutedEventArgs e) => CopyToClipboard(LibraryCopy.Name(ContextRow), "Name");
     private void OnCopyVersion(object sender, RoutedEventArgs e) => CopyToClipboard(LibraryCopy.Version(ContextRow), "Version");
@@ -471,7 +480,7 @@ public partial class MainWindow : Window
     private void OnCopyFilePath(object sender, RoutedEventArgs e) => CopyToClipboard(LibraryCopy.FilePath(ContextRow), "File path");
     private void OnCopyRow(object sender, RoutedEventArgs e) => CopyToClipboard(LibraryCopy.Row(ContextRow), "Whole row");
 
-    /// <summary>右键「打开File path」：在资源管理器里选中该文件（2026-11-01 用户要求；组行/空路径/文件不存在只提示）。</summary>
+    /// <summary>右键「打开文件路径」：在资源管理器里选中该文件（2026-11-01 用户要求；组行/空路径/文件不存在只提示）。</summary>
     // ── 资源管理器定位（2026-11-02：shell32 SHOpenFolderAndSelectItems，避免启动 explorer.exe 失败） ──
     [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     private static extern int SHParseDisplayName(
@@ -664,7 +673,7 @@ public partial class MainWindow : Window
 
     private LibraryRow? SelectedLibraryRow => _vm?.SelectedLibraryRow;
 
-    /// <summary>复制到剪贴板：空白给Status栏提示；剪贴板被占用等异常不崩（只提示）。</summary>
+    /// <summary>复制到剪贴板：空白给状态栏提示；剪贴板被占用等异常不崩（只提示）。</summary>
     private void CopyToClipboard(string? text, string what)
     {
         if (_vm is null) return;
@@ -698,7 +707,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Export log（2026-11-01 用户要求）：默认目录**程序目录**、默认名 `日志-yyyyMMdd-HHmmss.txt`；
+    /// 导出日志（2026-11-01 用户要求）：默认目录**程序目录**、默认名 `日志-yyyyMMdd-HHmmss.txt`；
     /// 对话框是用户交互（UI 线程），真正写盘在 <see cref="MainViewModel.ExportLogAsync"/> 里走 Task.Run。
     /// </summary>
     /// <summary>B4 收尾（2026-11-04）：只清空日志面板，不动文件日志。</summary>
@@ -790,14 +799,14 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── 刷新：清除Status标记（按钮 + 右键菜单共用） ─────────────────────────
+    // ── 刷新：清除状态标记（按钮 + 右键菜单共用） ─────────────────────────
     /// <summary>
     /// 刷新（工具栏 ⟳ + 右键菜单共用；2026-11-02 用户定**与「清空已结束」合并**）：
     /// 清当前设备已结束任务 + 清资料库红/黄/绿标记（勾保留）。
     /// </summary>
     private void OnClearMarksClick(object sender, RoutedEventArgs e) => _vm?.RefreshMarksAndClearFinished();
 
-    // ── 多选 / Install到…（2026-11-07） ──────────────────────────────────────────
+    // ── 多选 / 安装到…（2026-11-07） ──────────────────────────────────────────
 
     private void OnToggleMultiSelectClick(object sender, RoutedEventArgs e)
     {
@@ -832,7 +841,7 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    /// <summary>顶部「Install到…」/ 多选右键共用菜单；具体设备二级悬浮只有「Install」。</summary>
+    /// <summary>顶部「安装到…」/ 多选右键共用菜单；具体设备二级悬浮只有「安装」。</summary>
     private ContextMenu BuildInstallToMenu(bool includeSelectionActions, bool isGroupRow = false)
     {
         var menu = new ContextMenu();
@@ -949,7 +958,7 @@ public partial class MainWindow : Window
     {
         if (sender is not Button button || button.ContextMenu is null) return;
 
-        // 菜单里的勾选Status每次打开时按 VM 同步（模式项不走绑定，避免双向绑定打架）
+        // 菜单里的勾选状态每次打开时按 VM 同步（模式项不走绑定，避免双向绑定打架）
         ModeContains.IsChecked = _vm.SearchMatchMode == SearchMatchMode.Contains;
         ModePrefix.IsChecked = _vm.SearchMatchMode == SearchMatchMode.Prefix;
         ModeExact.IsChecked = _vm.SearchMatchMode == SearchMatchMode.Exact;
@@ -1058,7 +1067,7 @@ public partial class MainWindow : Window
         _ => "",
     };
 
-    // ── 行高快捷调节（2026-11-01 用户定：Settings键 Grid.RowHeight；Settings面板留 M7） ──────────
+    // ── 行高快捷调节（2026-11-01 用户定：设置键 Grid.RowHeight；设置面板留 M7） ──────────
     private void OnRowHeightSmall(object sender, RoutedEventArgs e) => SetLibraryRowHeight(24);
 
     private void OnRowHeightMedium(object sender, RoutedEventArgs e) => SetLibraryRowHeight(32);
@@ -1088,6 +1097,23 @@ public partial class MainWindow : Window
         ApplyLeftMode();
     }
 
+    private void OnToggleDeviceAppsMultiSelectClick(object sender, RoutedEventArgs e)
+    {
+        if (_vm is null) return;
+        ClearDeviceAppArmed();
+        _vm.ToggleDeviceAppsMultiSelectMode();
+        DeviceAppsGrid.SelectedItem = null;
+    }
+
+    private void OnUninstallSelectedDeviceAppsClick(object sender, RoutedEventArgs e)
+        => _vm?.UninstallSelectedDeviceApps();
+
+    private void OnSelectAllDeviceAppsClick(object sender, RoutedEventArgs e)
+        => _vm?.SelectAllDeviceApps();
+
+    private void OnClearDeviceAppsSelectionClick(object sender, RoutedEventArgs e)
+        => _vm?.ClearDeviceAppsSelection();
+
     private void ApplyLeftMode()
     {
         var deviceMode = _vm?.IsDeviceAppsMode == true;
@@ -1102,20 +1128,45 @@ public partial class MainWindow : Window
         AdvancedFilterButton.Visibility = libraryControls;
         CompatFilterCombo.Visibility = libraryControls;
         LibraryCount.Visibility = libraryControls;
+        MultiSelectButton.Visibility = libraryControls;
+        GroupFilterCombo.Visibility = libraryControls;
+        DeviceAppsToolbar.Visibility = deviceMode ? Visibility.Visible : Visibility.Collapsed;
         LibraryGrid.Visibility = deviceMode ? Visibility.Collapsed : Visibility.Visible;
         DeviceAppsGrid.Visibility = deviceMode ? Visibility.Visible : Visibility.Collapsed;
-        if (!deviceMode) ClearDeviceAppArmed();
+        if (!deviceMode)
+        {
+            ClearDeviceAppArmed();
+            _vm?.ExitDeviceAppsMultiSelect();
+        }
     }
 
     private DeviceAppRow? _deviceAppArmed;
     private long _deviceAppArmedAtMs;
     private DispatcherTimer? _deviceAppArmedTimer;
 
+    // 设备应用拖动多选：与资料库共用 VM 的范围选择接口。
+    private DeviceAppRow? _deviceAppDragCandidate;
+    private System.Windows.Point _deviceAppDragStartPoint;
+    private bool _deviceAppDragMoved;
+
     private void OnDeviceAppsPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (_vm is null) return;
         var row = FindDataContext<DeviceAppRow>(e.OriginalSource);
         if (row is null) return;
+
+        // 设备应用页多选：与资料库同样的拖动范围选择；未拖动时在 MouseUp 才切换选中。
+        if (_vm.IsDeviceAppsMultiSelectMode)
+        {
+            ClearDeviceAppArmed();
+            DeviceAppsGrid.SelectedItem = null;
+            _deviceAppDragCandidate = row;
+            _deviceAppDragStartPoint = e.GetPosition(DeviceAppsGrid);
+            _deviceAppDragMoved = false;
+            DeviceAppsGrid.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
 
         var now = Environment.TickCount64;
         if (ReferenceEquals(row, _deviceAppArmed) && DoubleClickState.IsSecondClick(_deviceAppArmedAtMs, now))
@@ -1134,6 +1185,124 @@ public partial class MainWindow : Window
         _deviceAppArmedTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DoubleClickState.WindowMs) };
         _deviceAppArmedTimer.Tick += (_, _) => ClearDeviceAppArmed();
         _deviceAppArmedTimer.Start();
+    }
+
+    private void OnDeviceAppsPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_vm is null) return;
+        var row = FindDataContext<DeviceAppRow>(e.OriginalSource);
+        if (row is null)
+        {
+            DeviceAppsGrid.ContextMenu = null;
+            return;
+        }
+
+        // 右键行本身也参与多选：多选模式下右键未选中项先选中，再给出“卸载选中”。
+        if (_vm.IsDeviceAppsMultiSelectMode && !row.IsMultiSelected)
+        {
+            _vm.ToggleDeviceAppMultiSelect(row);
+            RefreshDeviceAppsSelectionBindings();
+        }
+
+        DeviceAppsGrid.ContextMenu = BuildDeviceAppsContextMenu(row);
+        DeviceAppsGrid.ContextMenu.PlacementTarget = DeviceAppsGrid;
+        DeviceAppsGrid.ContextMenu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private ContextMenu BuildDeviceAppsContextMenu(DeviceAppRow row)
+    {
+        var menu = new ContextMenu();
+        var single = new MenuItem { Header = "卸载此应用" };
+        single.Click += (_, _) => _vm?.UninstallDeviceApp(row);
+        menu.Items.Add(single);
+
+        if (_vm?.IsDeviceAppsMultiSelectMode == true)
+        {
+            var selected = _vm.DeviceAppsSelectedCount;
+            var batch = new MenuItem
+            {
+                Header = $"Uninstall selected ({selected})",
+                IsEnabled = selected > 0,
+            };
+            batch.Click += (_, _) => _vm?.UninstallSelectedDeviceApps();
+            menu.Items.Add(batch);
+
+            menu.Items.Add(new Separator());
+            var all = new MenuItem { Header = "Select all" };
+            all.Click += (_, _) =>
+            {
+                _vm?.SelectAllDeviceApps();
+                RefreshDeviceAppsSelectionBindings();
+            };
+            menu.Items.Add(all);
+            var clear = new MenuItem { Header = "Clear selection" };
+            clear.Click += (_, _) =>
+            {
+                _vm?.ClearDeviceAppsSelection();
+                RefreshDeviceAppsSelectionBindings();
+            };
+            menu.Items.Add(clear);
+        }
+        else
+        {
+            menu.Items.Add(new Separator());
+            var multi = new MenuItem { Header = "Enter multi-select mode" };
+            multi.Click += (_, _) =>
+            {
+                if (_vm is null) return;
+                _vm.ToggleDeviceAppsMultiSelectMode();
+                RefreshDeviceAppsSelectionBindings();
+            };
+            menu.Items.Add(multi);
+        }
+
+        return menu;
+    }
+
+    private void RefreshDeviceAppsSelectionBindings()
+    {
+        // 属性通知由 VM 发出；这里只清掉 DataGrid 的系统选中态，避免蓝底与自绘蓝底叠在一起。
+        DeviceAppsGrid.SelectedItem = null;
+    }
+
+    private void OnDeviceAppsPreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_deviceAppDragCandidate is null || e.LeftButton != MouseButtonState.Pressed || _vm is null) return;
+        var pos = e.GetPosition(DeviceAppsGrid);
+        if (!_deviceAppDragMoved)
+        {
+            if (Math.Abs(pos.X - _deviceAppDragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(pos.Y - _deviceAppDragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+            if (!_vm.BeginDeviceAppDragSelection(_deviceAppDragCandidate))
+            {
+                _deviceAppDragCandidate = null;
+                DeviceAppsGrid.ReleaseMouseCapture();
+                return;
+            }
+            _deviceAppDragMoved = true;
+        }
+
+        var current = FindRowAtPoint(DeviceAppsGrid, pos)?.Item as DeviceAppRow;
+        if (current is not null)
+        {
+            _vm.SelectDeviceAppDragRange(_deviceAppDragCandidate, current);
+            e.Handled = true;
+        }
+    }
+
+    private void OnDeviceAppsPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        var candidate = _deviceAppDragCandidate;
+        var moved = _deviceAppDragMoved;
+        _deviceAppDragCandidate = null;
+        _deviceAppDragMoved = false;
+        if (DeviceAppsGrid.IsMouseCaptured) DeviceAppsGrid.ReleaseMouseCapture();
+        if (candidate is null || _vm is null) return;
+        if (!moved) _vm.ToggleDeviceAppMultiSelect(candidate);
+        DeviceAppsGrid.SelectedItem = null;
+        e.Handled = true;
     }
 
     private void ClearDeviceAppArmed()
@@ -1242,8 +1411,11 @@ public partial class MainWindow : Window
     }
 
     private DataGridRow? FindRowAtPoint(System.Windows.Point point)
+        => FindRowAtPoint(LibraryGrid, point);
+
+    private DataGridRow? FindRowAtPoint(DataGrid grid, System.Windows.Point point)
     {
-        var hit = LibraryGrid.InputHitTest(point) as DependencyObject;
+        var hit = grid.InputHitTest(point) as DependencyObject;
         return FindAncestor<DataGridRow>(hit);
     }
 
@@ -1381,16 +1553,16 @@ public partial class MainWindow : Window
         return dlg.ShowDialog(this) == true ? dlg.FileNames : null;
     }
 
-    // ── Settings窗口（2026-11-02 用户定；窗口本体在 SettingsWindow）─────────────────
+    // ── 设置窗口（2026-11-02 用户定；窗口本体在 SettingsWindow）─────────────────
 
-    /// <summary>当前是否Hide log栏（Settings窗口读）。</summary>
+    /// <summary>当前是否隐藏日志栏（设置窗口读）。</summary>
     internal bool SettingsLogHidden => _logHidden;
 
-    /// <summary>当前日志浮层宽度（Settings窗口读）。</summary>
+    /// <summary>当前日志浮层宽度（设置窗口读）。</summary>
     internal double SettingsLogOverlayWidth => _layout.LogOverlayWidth;
 
     /// <summary>
-    /// Settings窗口的布局预览/应用：日志栏显隐 + 浮层宽度（三栏比例只由"恢复默认"按钮动）。
+    /// 设置窗口的布局预览/应用：日志栏显隐 + 浮层宽度（三栏比例只由"Restore defaults"按钮动）。
     /// </summary>
     internal void ApplySettingsLayout(bool logHidden, double overlayWidth)
     {
@@ -1398,7 +1570,7 @@ public partial class MainWindow : Window
         _layout = _layout with { LogOverlayWidth = Math.Clamp(overlayWidth, 260, 900) };
     }
 
-    /// <summary>Settings窗口「恢复默认三栏比例」。</summary>
+    /// <summary>设置窗口「恢复默认三栏比例」。</summary>
     internal void ResetSettingsLayoutColumns()
     {
         _layout = _layout with { Columns = LayoutState.Default.Columns };
@@ -1417,7 +1589,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            // Settings窗口打不开也不能把程序带崩：写 crash.log 留证据
+            // 设置窗口打不开也不能把程序带崩：写 crash.log 留证据
             Services.CrashReporter.Write("Could not open the settings window", ex);
             MessageBox.Show(this, "Could not open the settings window:" + ex.Message, "Settings", MessageBoxButton.OK, MessageBoxImage.Error);
         }

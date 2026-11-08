@@ -7,7 +7,7 @@ using IdeviceGui.Services.Parsing;
 
 namespace IdeviceGui.Services.Scanning;
 
-/// <summary>Enumerate到的一个候选文件（列表阶段的原始事实）。</summary>
+/// <summary>枚举到的一个候选文件（列表阶段的原始事实）。</summary>
 internal sealed record ScanFile(
     string Path,
     string NormalizedPath,
@@ -31,9 +31,9 @@ internal enum SaveAttemptStatus
 internal readonly record struct SaveAttempt(SaveAttemptStatus Status, int Attempts, Exception? Error);
 
 /// <summary>
-/// M2 扫描器：Enumerate → 身份 → 对账 → Parse（docs/03 §3.3 / §3.4）。
+/// M2 扫描器：枚举 → 身份 → 对账 → 解析（docs/03 §3.3 / §3.4）。
 /// <para>
-/// 两个阶段：**列表/对账**（写库一次事务）→ **Parse**（并发 2，逐包独立失败）。
+/// 两个阶段：**列表/对账**（写库一次事务）→ **解析**（并发 2，逐包独立失败）。
 /// 所有方法同步跑在调用方线程上（调用方在后台线程调用，硬约束 #2）。
 /// </para>
 /// </summary>
@@ -43,7 +43,7 @@ internal sealed class IpaScanner
     private readonly ScanOptions _options;
     private readonly Action<string>? _log;
 
-    // M3 深Parse：图标缓存目录 / 档位与选择参数 / JPEG 兜底解码器（WPF，MTA 下也可能为 null）
+    // M3 深解析：图标缓存目录 / 档位与选择参数 / JPEG 兜底解码器（WPF，MTA 下也可能为 null）
     private readonly string? _dataDirectory;
     private readonly IconCacheOptions? _iconOptions;
     private readonly IconRequest _iconRequest;
@@ -96,7 +96,7 @@ internal sealed class IpaScanner
 
     /// <param name="forceReparse">
     /// **按次**的全量重扫开关（2026-10-31 从共享可变属性改成参数，见 `进度 §5.2` 第 3 条）：
-    /// Parse阶段连 `Ok` 行也重Parse。放在参数上就不会出现"上一次调用留下的状态影响下一次"。
+    /// 解析阶段连 `Ok` 行也重解析。放在参数上就不会出现"上一次调用留下的状态影响下一次"。
     /// </param>
     public async Task<ScanResult> ScanAsync(
         long scanRootId,
@@ -142,7 +142,7 @@ internal sealed class IpaScanner
         var probeError = TryWriteProbe();
         if (probeError is not null)
         {
-            result.Error = "Could not write to database; skipping this scan: " + probeError;
+            result.Error = "Failed to write to the database; skipping this scan: " + probeError;
             _log?.Invoke(result.Error);
             result.TotalMs = sw.ElapsedMilliseconds;
             return result;
@@ -158,16 +158,16 @@ internal sealed class IpaScanner
 
         var parseSw = Stopwatch.StartNew();
         // 除了新行（Pending），每次扫描也重试失败行：不再靠内容哈希判断变化，
-        // 而是"目录里在就重新Parse一遍"，失败的行下次扫描自动再试（用户 2026-10-30 拍板）。
-        // **全量重扫**（2026-10-31 用户要的按钮）：连 Ok 行也重Parse——
+        // 而是"目录里在就重新解析一遍"，失败的行下次扫描自动再试（用户 2026-10-30 拍板）。
+        // **全量重扫**（2026-10-31 用户要的按钮）：连 Ok 行也重解析——
         // 用来补旧版本入库、深字段（体积 / 图标 / 架构）为空的行；ParseVersion 照常 +1。
         // 口径来自本次调用参数（不是共享可变属性，见 进度 §5.2 第 3 条）。
         var pending = PackageStore.LoadByRoot(_db, scanRootId)
             .Where(r => r.ExistsFlag && (forceReparse || r.ParseState is ParseStates.Pending or ParseStates.Failed))
             .ToList();
         if (forceReparse) _log?.Invoke($"Full rescan: re-parsing all {pending.Count} rows (including successful ones)");
-        // 即使本轮没有待Parse行也要走一遍：图标引用计数清理、LRU 兜底、图标解码统计行都在里面
-        // （体检报告 P2-4：Parse 0 的轮次原先整段跳过，统计行与清理都不发生）。
+        // 即使本轮没有待解析行也要走一遍：图标引用计数清理、LRU 兜底、图标解码统计行都在里面
+        // （体检报告 P2-4：解析 0 的轮次原先整段跳过，统计行与清理都不发生）。
         _saveCount = 0;
         _saveFailed = 0;
         _saveAborted = 0;
@@ -221,7 +221,7 @@ internal sealed class IpaScanner
         var options = new EnumerationOptions
         {
             RecurseSubdirectories = true,
-            IgnoreInaccessible = true,                 // 单个目录None权限：跳过并继续（docs/03 §3.1）
+            IgnoreInaccessible = true,                 // 单个目录无权限：跳过并继续（docs/03 §3.1）
             AttributesToSkip = FileAttributes.ReparsePoint, // 跳过 junction / symlink，防止目录环
             MatchCasing = MatchCasing.CaseInsensitive,
             ReturnSpecialDirectories = false,
@@ -332,7 +332,7 @@ internal sealed class IpaScanner
 
             if (byPath)
             {
-                // 同路径、ID 变了 / 路径兜底命中 → 替换（保留 Id，Parse阶段 +1）
+                // 同路径、ID 变了 / 路径兜底命中 → 替换（保留 Id，解析阶段 +1）
                 ApplyIdentity(row, file);
                 MarkPending(row);
                 row.FileSize = file.Size;
@@ -360,7 +360,7 @@ internal sealed class IpaScanner
             }
             else
             {
-                result.Touched++;   // 改包但不换应用：只更新大小 / mtime，不重Parse（docs/03 §3.2.1）
+                result.Touched++;   // 改包但不换应用：只更新大小 / mtime，不重解析（docs/03 §3.2.1）
             }
 
             row.FileSize = file.Size;
@@ -369,7 +369,7 @@ internal sealed class IpaScanner
         }
 
         // ④（已删除）原方案 A 的"同大小桶内比 SHA1"恢复映射：内容哈希已砍，不再有恢复匹配。
-        //    同路径回来的文件仍在 ② 里按路径复用同一行（大小/mtime 变了就重Parse），不会每次删/放都新增两行。
+        //    同路径回来的文件仍在 ② 里按路径复用同一行（大小/mtime 变了就重解析），不会每次删/放都新增两行。
 
         // ⑤ 仍未匹配的行 → ExistsFlag = 0（保留行，队列可能引用）
         foreach (var row in unmatchedRows)
@@ -394,11 +394,11 @@ internal sealed class IpaScanner
 
     private static bool IsReplacement(PackageRow row, ScanFile file)
     {
-        if (string.IsNullOrWhiteSpace(row.BundleId)) return true;   // 从没Parse过 → 当替换
+        if (string.IsNullOrWhiteSpace(row.BundleId)) return true;   // 从没解析过 → 当替换
         try
         {
             var info = IpaReader.Read(file.Path);
-            if (info.Error is not null) return true;                // plist 核对失败 → 按替换（宁可重Parse）
+            if (info.Error is not null) return true;                // plist 核对失败 → 按替换（宁可重解析）
             return !string.Equals(info.BundleId, row.BundleId, StringComparison.OrdinalIgnoreCase);
         }
         catch
@@ -438,7 +438,7 @@ internal sealed class IpaScanner
         row.AppDirName = null;
         row.ContentHash = null;   // 内容变了，旧哈希不能再用
 
-        // M3 深Parse列也要清：否则替换后Parse失败的行会带着上一个包的 Arch / 体积 / 图标写回库（体检报告 P1-7）。
+        // M3 深解析列也要清：否则替换后解析失败的行会带着上一个包的 Arch / 体积 / 图标写回库（体检报告 P1-7）。
         row.Sdk = null;
         row.DeviceFamily = null;
         row.RequiredCaps = null;
@@ -474,7 +474,7 @@ internal sealed class IpaScanner
         LastSeenUtc = now,
     };
 
-    // ── Parse阶段 ──────────────────────────────────────────────────────────────
+    // ── 解析阶段 ──────────────────────────────────────────────────────────────
 
     private void ParsePending(List<PackageRow> pending, IProgress<ScanProgress>? progress,
         CancellationToken ct, ScanResult result)
@@ -491,7 +491,7 @@ internal sealed class IpaScanner
         var batchGate = new object();
         var done = 0;
 
-        // Parse线程**只入队**；写库与回调都在这个提交者线程上做。
+        // 解析线程**只入队**；写库与回调都在这个提交者线程上做。
         // 原因（2026-10-30 实测）：在 Parallel.ForEach 的工作线程里直接写库会出现"第一批之后就停住"。
         using var queue = new BlockingCollection<List<PackageRow>>(new ConcurrentQueue<List<PackageRow>>());
         var committer = Task.Factory.StartNew(() =>
@@ -570,7 +570,7 @@ internal sealed class IpaScanner
             {
                 row.ParseState = ParseStates.Failed;
                 row.ParseError = ex.GetType().Name + ": " + ex.Message;
-                ClearParseFields(row);   // 替换后Parse失败：不能留着上一个包的深字段（体检报告 P1-7）
+                ClearParseFields(row);   // 替换后解析失败：不能留着上一个包的深字段（体检报告 P1-7）
                 _log?.Invoke($"{row.FileName}: parse incomplete: {ex.GetType().Name}: {ex.Message}");   // P2-5：原因也要进文件日志
                 Interlocked.Increment(ref parseFailed);
             }
@@ -792,7 +792,7 @@ internal sealed class IpaScanner
     private static bool IsRetryableSaveError(Exception ex) =>
         ex is Microsoft.Data.Sqlite.SqliteException or IOException;
 
-    /// <summary>把一行清成"没Parse过"（失败行不留半截元数据，避免列表显示错字段）。</summary>
+    /// <summary>把一行清成"没解析过"（失败行不留半截元数据，避免列表显示错字段）。</summary>
     private static void ClearParseFields(PackageRow row)
     {
         row.BundleId = null;
@@ -819,7 +819,7 @@ internal sealed class IpaScanner
 
     /// <summary>
     /// 选一张图标 → 解码（CgBI 还原）→ 缩到档位 → 写 <c>data\icons\&lt;sha1&gt;-&lt;档位&gt;.png</c>。
-    /// **失败不算Parse失败**（docs/04 §4：用默认图标，行仍是 Ok），只返回 null 并记日志。
+    /// **失败不算解析失败**（docs/04 §4：用默认图标，行仍是 Ok），只返回 null 并记日志。
     /// </summary>
     private string? TrySaveIcon(string ipaPath, DeepParseResult deep)
     {
@@ -865,7 +865,7 @@ internal sealed class IpaScanner
             }
             else
             {
-                // 原子写：不同包可能共享同一张图标（同 sha1），并行Parse会同时写同一个文件；
+                // 原子写：不同包可能共享同一张图标（同 sha1），并行解析会同时写同一个文件；
                 // 先写临时文件再改名，避免读到写了一半的 PNG。
                 var temp = filePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
                 File.WriteAllBytes(temp, loaded.PngBytes);

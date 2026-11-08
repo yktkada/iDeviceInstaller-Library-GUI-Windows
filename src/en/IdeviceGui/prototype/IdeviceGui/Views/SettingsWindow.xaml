@@ -1,11 +1,11 @@
-﻿<Window x:Class="IdeviceGui.Views.SettingsWindow" x:ClassModifier="internal"
+<Window x:Class="IdeviceGui.Views.SettingsWindow" x:ClassModifier="internal"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Settings" Icon="/app.ico" Width="620" Height="660" MinWidth="560" MinHeight="520"
+        Title="Settings" Width="620" Height="660" MinWidth="560" MinHeight="520"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        AutomationProperties.AutomationId="SettingsWindow">
-    <!-- 生效方式（2026-11-02 用户定）：窗口内即时预览，点「OK / Apply」才写库，「Cancel / 关窗」回滚。
-         例外（2026-11-03 审查 N2）：Scan根添加/删除、列宽复位是**立即生效的动作**，不受「Cancel」影响。 -->
+        AutomationProperties.AutomationId="SettingsWindow" Icon="/app.ico">
+    <!-- 生效方式（2026-11-02 用户定）：窗口内即时预览，点「确定 / 应用」才写库，「取消 / 关窗」回滚。
+         例外（2026-11-03 审查 N2）：扫描根添加/删除、列宽复位是**立即生效的动作**，不受「取消」影响。 -->
     <Window.Resources>
         <Style x:Key="SectionTitle" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="Bold" />
@@ -30,7 +30,7 @@
         </StackPanel>
 
         <TabControl x:Name="Tabs" AutomationProperties.AutomationId="SettingsTabs">
-            <!-- Library -->
+            <!-- 资料库 -->
             <TabItem Header="Library">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                     <StackPanel>
@@ -108,7 +108,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Scan -->
+            <!-- 扫描 -->
             <TabItem Header="Scan">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                     <StackPanel>
@@ -138,7 +138,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Icons -->
+            <!-- 图标 -->
             <TabItem Header="Icons">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                     <StackPanel>
@@ -162,7 +162,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Log -->
+            <!-- 日志 -->
             <TabItem Header="Log">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                     <StackPanel>
@@ -175,7 +175,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Layout -->
+            <!-- 布局 -->
             <TabItem Header="Layout">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                     <StackPanel>
@@ -198,7 +198,32 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Devices -->
+            <!-- Queue -->
+            <TabItem Header="Queue">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <Button Content="Restore defaults" Style="{StaticResource GroupResetButton}" Tag="Queue" Click="OnResetGroupClick" />
+                        <TextBlock Text="Queue row fields (order / visibility)" Style="{StaticResource SectionTitle}" />
+                        <ListBox x:Name="QueueFieldsList" Height="260"
+                                 AutomationProperties.AutomationId="SettingsQueueFieldsList">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding Name}" IsChecked="{Binding Visible, Mode=TwoWay}"
+                                              Checked="OnQueueFieldCheckChanged" Unchecked="OnQueueFieldCheckChanged" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button Content="Move up" Padding="10,3" Click="OnQueueFieldUpClick" />
+                            <Button Content="Move down" Padding="10,3" Margin="8,0,0,0" Click="OnQueueFieldDownClick" />
+                        </StackPanel>
+                        <TextBlock Text="Status / Note / Name / Version / Installed size are shown by default. Notes appear only for Failed / Paused / Suspended; if every field is hidden, the status falls back."
+                                   TextWrapping="Wrap" Foreground="#FF666666" Margin="0,8,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- 设备 -->
             <TabItem Header="Devices">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                     <StackPanel>
@@ -251,7 +276,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- 关于：固定英文，不参与Apply / Cancel / Restore defaults（2026-11-08） -->
+            <!-- 关于：固定英文，不参与应用 / 取消 / 恢复默认（2026-11-08） -->
             <TabItem Header="About">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
                     <StackPanel>
