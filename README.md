@@ -6,6 +6,8 @@ For jailbroken legacy iOS devices with AppSync Unified. No signing, no sideloadi
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
+**Documentation:** [User guide](USER-GUIDE.md) · [Release notes](RELEASE_NOTES.md)
+
 A Windows desktop app for managing a local IPA library and installing apps on older iOS devices. Built with C# / WPF / .NET 10.
 
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4)

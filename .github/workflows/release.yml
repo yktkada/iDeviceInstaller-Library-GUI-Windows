@@ -40,7 +40,7 @@ jobs:
             New-Item -ItemType Directory -Force -Path $stage | Out-Null
             Copy-Item "$out\*" $stage -Recurse -Force
             Get-ChildItem $stage -Recurse -File -Filter '*.pdb' | Remove-Item -Force
-            Copy-Item LICENSE,COPYRIGHT,THIRD_PARTY_NOTICES.md,README.md,README.zh-CN.md,ASSETS.md $stage -Force
+            Copy-Item LICENSE,COPYRIGHT,THIRD_PARTY_NOTICES.md,README.md,README.zh-CN.md,USER-GUIDE.md,使用指南.md,ASSETS.md $stage -Force
             Copy-Item 'toolkit\*' $stage -Recurse -Force
             Get-ChildItem $stage -Recurse -File | ForEach-Object {
               $rel = $_.FullName.Substring($stage.Length).TrimStart('\')

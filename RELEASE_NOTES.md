@@ -19,6 +19,11 @@ IPA library manager and installer for legacy iOS devices on Windows.
 - Tested: iOS 4.1, 6.1.3, 7.1.1, 8.4.1
 - iPhone and iPad
 
+## Documentation
+
+- [User guide](USER-GUIDE.md)
+- [使用指南](使用指南.md)
+
 ## Packages
 
 - `IdeviceGui-en-Windows.zip` - English UI

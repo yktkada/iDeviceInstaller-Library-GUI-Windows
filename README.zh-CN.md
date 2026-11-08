@@ -4,6 +4,8 @@
 
 [English](README.md) | 简体中文
 
+**文档：** [使用指南](使用指南.md) · [更新日志](RELEASE_NOTES.md)
+
 一个用于管理本地 IPA 资料库，并向旧版 iOS 设备安装应用的 Windows 桌面程序。使用 C# / WPF / .NET 10 开发。
 
 ![平台](https://img.shields.io/badge/platform-Windows-0078D4)
